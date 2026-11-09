@@ -47,6 +47,8 @@ import com.jongjun.hangeoreum.data.AppData
 import com.jongjun.hangeoreum.data.Dates
 import com.jongjun.hangeoreum.data.Event
 import com.jongjun.hangeoreum.data.Goal
+import com.jongjun.hangeoreum.data.Kind
+import androidx.compose.foundation.horizontalScroll
 import com.jongjun.hangeoreum.data.Level
 import com.jongjun.hangeoreum.data.Store
 import com.jongjun.hangeoreum.data.goal
@@ -178,7 +180,10 @@ fun EventEditorSheet(req: EventEditReq, onDismiss: () -> Unit) {
     var ranged by remember { mutableStateOf(event?.isRange ?: req.onPlan) }
     var minute by remember { mutableIntStateOf(event?.minute ?: -1) }
     var color by remember { mutableIntStateOf(event?.color ?: 0) }
-    var keepCustom by remember { mutableStateOf(event?.customColor != null) }
+    var custom by remember {
+        mutableStateOf(event?.customColor ?: Kind.entries.getOrNull(req.kind)?.takeIf { it != Kind.GENERAL }?.color?.toInt())
+    }
+    var kind by remember { mutableIntStateOf(event?.type ?: req.kind) }
     var onPlan by remember { mutableStateOf(event?.onPlan ?: req.onPlan) }
     // which date is being picked: 0 = none, 1 = start, 2 = end
     var pickDate by remember { mutableIntStateOf(0) }
@@ -209,6 +214,19 @@ fun EventEditorSheet(req: EventEditReq, onDismiss: () -> Unit) {
 
             FieldLabel("무슨 일정인가요?")
             InputField(title, { title = it }, if (req.onPlan) "예: 졸업설계, 인턴, 여행" else "예: 친구랑 저녁 약속", focusRequester = focus)
+
+            FieldLabel("종류 · 일반이 아니면 이력서에 들어가요")
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Kind.entries.forEach { k ->
+                    ChoiceChip(k.label, kind == k.ordinal) {
+                        kind = k.ordinal
+                        custom = if (k == Kind.GENERAL) null else k.color.toInt()
+                    }
+                }
+            }
 
             Row(Modifier.padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                 T("여러 날 이어지는 일정", 15, Modifier.weight(1f), weight = FontWeight.Medium)
@@ -255,10 +273,10 @@ fun EventEditorSheet(req: EventEditReq, onDismiss: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 pal.itemColors.forEachIndexed { i, c ->
                     androidx.compose.foundation.layout.Box(
-                        Modifier.size(34.dp).clip(CircleShape).background(c).bounceClick { color = i; keepCustom = false },
+                        Modifier.size(34.dp).clip(CircleShape).background(c).bounceClick { color = i; custom = null },
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (i == color && !keepCustom) Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        if (i == color && custom == null) Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
                     }
                 }
             }
@@ -287,8 +305,9 @@ fun EventEditorSheet(req: EventEditReq, onDismiss: () -> Unit) {
                         memo = memo.trim(),
                         color = color,
                         onPlan = onPlan,
-                        customColor = if (keepCustom) event?.customColor else null,
+                        customColor = custom,
                         source = event?.source ?: "",
+                        type = kind,
                     )
                 )
                 close()

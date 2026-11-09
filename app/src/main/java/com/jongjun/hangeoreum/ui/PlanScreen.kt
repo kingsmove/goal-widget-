@@ -65,6 +65,7 @@ private const val MIN_ITEM_W = 96
 @Composable
 fun PlanScreen(data: AppData, nav: Nav) {
     var showGoals by rememberSaveable { mutableStateOf(true) }
+    var view by rememberSaveable { mutableStateOf(0) }
     var monthW by rememberSaveable { mutableFloatStateOf(68f) }
     val today = Dates.today()
     val nowDate = LocalDate.now()
@@ -136,8 +137,13 @@ fun PlanScreen(data: AppData, nav: Nav) {
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
         Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 20.dp, top = 20.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            T("장기 플랜", 26, Modifier.weight(1f), weight = FontWeight.Bold)
+            T(if (view == 1) "이력서" else "장기 플랜", 26, Modifier.weight(1f), weight = FontWeight.Bold)
             IconCircle(Icons.Filled.Add, { nav.editEvent(EventEditReq(null, today, onPlan = true)) }, tint = pal.blue, bg = pal.card)
+        }
+        Segmented(listOf("타임라인", "이력서"), view, Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) { view = it }
+        if (view == 1) {
+            ResumeView(data, nav)
+            return@Column
         }
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),

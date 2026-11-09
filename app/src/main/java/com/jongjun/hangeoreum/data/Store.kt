@@ -133,7 +133,7 @@ object Store {
                 put(JSONObject().apply {
                     put("id", e.id); put("title", e.title); put("day", e.day); put("endDay", e.endDay)
                     put("minute", e.minute); put("memo", e.memo); put("color", e.color); put("plan", e.onPlan)
-                    put("cc", e.customColor ?: JSONObject.NULL); put("src", e.source)
+                    put("cc", e.customColor ?: JSONObject.NULL); put("src", e.source); put("type", e.type)
                 })
             }
         })
@@ -212,6 +212,7 @@ object Store {
                     onPlan = o.optBoolean("plan", false),
                     customColor = o.optC("cc"),
                     source = o.optString("src", ""),
+                    type = o.optInt("type", 0),
                 )
             }
         } ?: emptyList()

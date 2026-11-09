@@ -23,6 +23,18 @@ data class Goal(
     val color: Int = -1,
 )
 
+/** What an event is, for the resume view. color = canvas-style default color. */
+enum class Kind(val label: String, val section: String, val color: Long) {
+    GENERAL("일반", "", 0xFF8B95A1),
+    WORK("근무·인턴", "경력", 0xFFA882FF),
+    EDU("학업", "학력·학업", 0xFFE0AC00),
+    CERT("자격증", "자격증", 0xFF08B94E),
+    LANG("어학", "어학", 0xFF00BFBC),
+    ACTIVITY("대외활동", "대외활동", 0xFFEC7500),
+    PROJECT("공모전·프로젝트", "공모전·프로젝트", 0xFFD4537E),
+    MILESTONE("마일스톤", "", 0xFF5F5E5A),
+}
+
 data class Session(
     val id: String,
     val goalId: String?,
@@ -47,7 +59,10 @@ data class Event(
     val customColor: Int? = null,
     /** "" = made in the app, "canvas" = imported from Obsidian. */
     val source: String = "",
+    /** [Kind] ordinal; anything but GENERAL shows up on the resume view. */
+    val type: Int = 0,
 ) {
+    val kind: Kind get() = Kind.entries.getOrElse(type) { Kind.GENERAL }
     val isRange: Boolean get() = endDay > day
     fun covers(d: Long): Boolean = d in day..endDay
 }

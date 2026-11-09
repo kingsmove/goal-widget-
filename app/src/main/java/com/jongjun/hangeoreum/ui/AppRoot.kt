@@ -50,7 +50,12 @@ import kotlinx.coroutines.delay
 data class GoalEditReq(val existing: Goal?, val level: Level, val parentId: String?)
 
 /** Request to open the event editor. */
-data class EventEditReq(val existing: Event?, val day: Long = Dates.today(), val onPlan: Boolean = false)
+data class EventEditReq(
+    val existing: Event?,
+    val day: Long = Dates.today(),
+    val onPlan: Boolean = false,
+    val kind: Int = 0,
+)
 
 const val SETTINGS = "__settings"
 

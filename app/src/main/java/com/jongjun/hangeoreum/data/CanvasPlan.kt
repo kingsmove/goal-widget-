@@ -109,6 +109,7 @@ object CanvasPlan {
                 onPlan = true,
                 customColor = colorOf(n.color),
                 source = SOURCE,
+                type = kindOf(n.color).ordinal,
             )
         }
         return CanvasResult(out, months.size)
@@ -196,6 +197,18 @@ object CanvasPlan {
             }
         }
         return null
+    }
+
+    /** Matches the color legend of the user's canvas template. */
+    fun kindOf(c: String?): Kind = when (c?.trim()?.lowercase()) {
+        "4" -> Kind.CERT
+        "5" -> Kind.LANG
+        "6" -> Kind.WORK
+        "2" -> Kind.ACTIVITY
+        "3" -> Kind.EDU
+        "#d4537e" -> Kind.PROJECT
+        "#5f5e5a" -> Kind.MILESTONE
+        else -> Kind.GENERAL
     }
 
     /** Obsidian canvas colors: "1".."6" presets or "#rrggbb". */

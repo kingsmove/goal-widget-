@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">한걸음</string>
+    <string name="app_name">UFP</string>
     <string name="widget_name">오늘의 목표</string>
     <string name="widget_desc">오늘 할 일, 달성률, 공부 시간, 다음 일정</string>
 </resources>
