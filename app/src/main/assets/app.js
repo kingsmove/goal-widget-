@@ -23,6 +23,7 @@ const toKRW = (a, c) => c === 'KRW' ? a : a * (num(S.settings.rates[c]) || 0);
 
 /* ============ constants ============ */
 const CATS = {
+  flight: { n: '항공', c: '#0BA5EC', i: 'plane' },
   food: { n: '맛집', c: '#FF6B4A', i: 'food' },
   cafe: { n: '카페', c: '#C0874F', i: 'cup' },
   stay: { n: '숙소', c: '#7B61FF', i: 'bed' },
@@ -32,7 +33,8 @@ const CATS = {
   work: { n: '일', c: '#F5A623', i: 'work' },
   etc: { n: '기타', c: '#8B95A1', i: 'dots' },
 };
-const ECATS = { food: '식비', cafe: '카페·간식', move: '교통', stay: '숙소', see: '관광', shop: '쇼핑', etc: '기타' };
+const PCATS = Object.fromEntries(Object.entries(CATS).filter(([k]) => k !== 'flight'));
+const ECATS = { flight: '항공권', food: '식비', cafe: '카페·간식', move: '교통', stay: '숙소', see: '관광', shop: '쇼핑', etc: '기타' };
 const STATUS = {
   want: { n: '가고 싶음', c: '#3182F6' },
   booked: { n: '예약함', c: '#7B61FF' },
@@ -73,7 +75,7 @@ function seed() {
       ...[6, 7, 8, 9].map((d, i) => ({ id: uid(), date: `2027-01-${pad(d)}`, time: '', title: `CES 근무 ${i + 1}일차`, cat: 'work', placeId: lvcc, memo: '', done: false })),
       { id: uid(), date: '2027-01-10', time: '', title: '체크아웃 → 캐나다 이동', cat: 'move', placeId: '', memo: '', done: false },
     ],
-    bookings: [], expenses: [], photos: [],
+    bookings: [], expenses: [], photos: [], budget: [], maps: [],
   };
 }
 function load() {
@@ -82,7 +84,7 @@ function load() {
   const d = seed();
   S.settings = Object.assign({}, d.settings, S.settings);
   S.settings.rates = Object.assign({}, d.settings.rates, S.settings.rates);
-  for (const k of ['places', 'plans', 'bookings', 'expenses', 'photos']) if (!Array.isArray(S[k])) S[k] = [];
+  for (const k of ['places', 'plans', 'bookings', 'expenses', 'photos', 'budget', 'maps']) if (!Array.isArray(S[k])) S[k] = [];
   if (!Array.isArray(S.modules)) S.modules = d.modules;
   for (const k of Object.keys(MODS)) if (!S.modules.find(m => m.k === k)) S.modules.push({ k, on: true });
   S.modules = S.modules.filter(m => MODS[m.k]);
@@ -343,7 +345,7 @@ function placeForm(draft, isNew) {
         <div id="fLocRes"></div>
         <div class="coord" id="fCoord">${hasLoc ? `${ico('pin', 'i s')} 위치 저장됨 (${(+p.lat).toFixed(4)}, ${(+p.lng).toFixed(4)})` : '위치가 없으면 지도에 안 보여요'}</div>
         <div class="btns" style="margin-top:8px"><button class="btn" data-a="loc-pin">${ico('globe', 'i s')}지도에서 찍기</button><button class="btn" data-a="loc-me">${ico('nav', 'i s')}현재 위치</button></div></div>
-      <div class="f"><label>종류</label>${pick('fCat', CATS, p.cat)}</div>
+      <div class="f"><label>종류</label>${pick('fCat', PCATS, p.cat)}</div>
       <div class="f"><label>상태</label>${pick('fStat', STATUS, p.status)}</div>
       <div class="f"><label>주소</label><input class="in" id="fAddr" value="${esc(p.address)}"></div>
       <div class="f"><label>갈 날짜</label><input class="in" type="date" id="fDate" value="${esc(p.date)}"></div>
@@ -403,9 +405,73 @@ async function locSearch() {
 }
 
 /* ============ MONEY ============ */
+const ECO = Object.fromEntries(Object.entries(ECATS).map(([k, n]) => [k, { n, c: CATS[k].c, i: CATS[k].i }]));
+const CURS = { USD: { n: '$ 달러' }, CAD: { n: 'C$ 캐나다' }, KRW: { n: '₩ 원' } };
+const budgetTotal = () => S.budget.length ? S.budget.reduce((a, b) => a + toKRW(num(b.amount), b.cur), 0) : num(S.settings.budget);
+const BUD_TEMPLATE = [
+  ['flight', '왕복 항공권'], ['flight', '캐나다 이동 항공권'], ['etc', 'ESTA·여행자보험'],
+  ['stay', 'LA 숙소'], ['stay', '라스베이거스 숙소'], ['move', 'LA → 라스베이거스 버스'],
+  ['move', '현지 교통 (우버·버스)'], ['food', '식비'], ['see', '관광·입장료'], ['shop', '쇼핑·기념품'], ['etc', '예비비'],
+];
+function vBudget() {
+  const B = budgetTotal();
+  const spent = S.expenses.reduce((a, e) => a + toKRW(num(e.amount), e.cur), 0);
+  let h = `<div class="sec"><div class="card"><div class="sub">총 예산</div><div class="money-big">${fmtKRW(B)}</div>
+    <div class="sub" style="margin-top:4px">${S.budget.length ? `${S.budget.length}개 항목 합계 · 결제 완료 ${S.budget.filter(b => b.paid).length}개` : '항목을 넣으면 자동으로 합산돼요'}</div>
+    ${B > 0 ? `<div class="bar"><i style="width:${Math.min(100, spent / B * 100)}%;background:${spent > B ? 'var(--red)' : 'var(--blue)'}"></i></div>
+    <div class="row" style="justify-content:space-between;margin-top:10px;font-size:14px"><span class="sub">지금까지 쓴 돈 ${fmtKRW(spent)}</span><b style="color:${spent > B ? 'var(--red)' : 'var(--t1)'}">${spent > B ? fmtKRW(spent - B) + ' 초과' : fmtKRW(B - spent) + ' 남음'}</b></div>` : ''}
+  </div></div>`;
+  if (!S.budget.length) return h + `<div class="sec"><div class="list">${empty('예산 항목이 없어요', '항공권, 숙소, 식비처럼 항목별로 금액을 넣으면<br>실제 지출과 비교해줘요')}<div style="padding:0 18px 18px"><button class="btn pri" style="width:100%" data-a="bud-template">자주 쓰는 항목으로 시작하기</button></div></div></div>` + fab('bud-add');
+  // per category: planned vs spent
+  const plan = {}, act = {};
+  S.budget.forEach(b => plan[b.cat] = (plan[b.cat] || 0) + toKRW(num(b.amount), b.cur));
+  S.expenses.forEach(e => act[e.cat] = (act[e.cat] || 0) + toKRW(num(e.amount), e.cur));
+  const keys = Object.keys(ECATS).filter(k => plan[k] || act[k]);
+  h += `<div class="lbl">분류별 예산 vs 실제</div><div class="sec" style="margin-top:0"><div class="card" style="padding:18px">${keys.map(k => {
+    const pl = plan[k] || 0, ac = act[k] || 0, over = ac > pl;
+    return `<div style="margin-bottom:14px"><div class="row" style="font-size:14px"><span class="dot" style="background:${CATS[k].c}"></span><span style="flex:1;font-weight:600">${ECATS[k]}</span><span class="sub" style="color:${over ? 'var(--red)' : ''}">${fmtShortKRW(ac)}</span><span class="sub">&nbsp;/ ${fmtShortKRW(pl)}</span></div>
+      <div class="bar" style="height:6px;margin-top:7px"><i style="width:${pl ? Math.min(100, ac / pl * 100) : (ac ? 100 : 0)}%;background:${over ? 'var(--red)' : CATS[k].c}"></i></div></div>`;
+  }).join('')}<div class="sub" style="margin-top:-2px">쓴 돈 / 예산 · 빨간색은 예산 초과</div></div></div>`;
+  const groups = {};
+  S.budget.forEach(b => (groups[b.cat] ||= []).push(b));
+  for (const k of Object.keys(ECATS).filter(k => groups[k])) {
+    const sum = groups[k].reduce((a, b) => a + toKRW(num(b.amount), b.cur), 0);
+    h += `<div class="day"><span class="n">${ECATS[k]}</span><span class="s" style="margin-left:auto">${fmtKRW(sum)}</span></div>
+      <div class="sec" style="margin-top:0"><div class="list">${groups[k].map(b => `<div class="li" data-a="bud-edit" data-id="${b.id}">${catIco(b.cat)}
+        <div class="m"><div class="t">${esc(b.title)}</div><div class="d">${b.paid ? tag('결제 완료', '#00B386') + ' ' : ''}${esc(b.memo || '')}</div></div>
+        <div>${num(b.amount) ? `<div class="r">${fmtCur(num(b.amount), b.cur)}</div>${b.cur !== 'KRW' ? `<div class="d" style="text-align:right;font-size:12px;color:var(--t3);margin-top:2px">${fmtKRW(toKRW(num(b.amount), b.cur))}</div>` : ''}` : '<div class="r" style="color:var(--blue)">금액 입력</div>'}</div></div>`).join('')}</div></div>`;
+  }
+  return h + fab('bud-add');
+}
+function budForm(b) {
+  const isNew = !b;
+  b = b ? { ...b } : { id: uid(), title: '', cat: 'food', amount: '', cur: 'KRW', memo: '', paid: false };
+  sheet({
+    title: isNew ? '예산 항목 추가' : '예산 항목',
+    body: `<div class="f"><label>항목</label><input class="in" id="fTitle" value="${esc(b.title)}" placeholder="예: 라스베이거스 숙소 5박"></div>
+      <div class="f"><label>예상 금액</label><input class="in amt" id="fAmt" inputmode="decimal" placeholder="0" value="${esc(b.amount)}"><div class="coord" id="fKRW"></div></div>
+      <div class="f">${pick('fCur', CURS, b.cur)}</div>
+      <div class="f"><label>분류</label>${pick('fCat', ECO, b.cat)}</div>
+      <div class="f"><label>결제</label>${pick('fPaid', { no: { n: '아직' }, yes: { n: '결제 완료' } }, b.paid ? 'yes' : 'no')}</div>
+      <div class="f"><label>메모</label><input class="in" id="fMemo" value="${esc(b.memo)}" placeholder="예: 1박 $90 × 5박"></div>
+      ${isNew ? '' : `<button class="btn" style="width:100%;margin-top:18px" data-a="bud-toexp" data-id="${b.id}">${ico('wallet', 'i s')}결제했으면 지출로 기록</button>`}`,
+    foot: `${isNew ? '' : `<button class="btn big red" data-a="bud-del" data-id="${b.id}" style="flex:0 0 90px">삭제</button>`}<button class="btn big pri" data-a="sheet-ok">저장</button>`,
+    mount: () => {
+      const upd = () => { const a = num($('#fAmt').value), c = pickVal('fCur'); $('#fKRW').textContent = a && c !== 'KRW' ? '≈ ' + fmtKRW(toKRW(a, c)) : ''; };
+      $('#fAmt').addEventListener('input', upd); $('#fCur').addEventListener('click', () => setTimeout(upd)); upd();
+    },
+    ok: () => {
+      const title = $('#fTitle').value.trim(); if (!title) { toast('항목 이름을 입력해주세요'); return false; }
+      Object.assign(b, { title, amount: num($('#fAmt').value), cur: pickVal('fCur'), cat: pickVal('fCat'), paid: pickVal('fPaid') === 'yes', memo: $('#fMemo').value.trim() });
+      upsert('budget', b); toast('저장했어요');
+    },
+  });
+}
 function vMoney() {
   const st = S.settings;
-  let h = hd('경비');
+  let h = hd('경비') + `<div class="sec" style="margin-top:0"><div class="seg">${[['spent', '쓴 돈'], ['plan', '예산 짜기']].map(([k, n]) => `<button class="${(ui.moneyView || 'spent') === k ? 'on' : ''}" data-a="mview" data-k="${k}">${n}</button>`).join('')}</div></div>`;
+  if (ui.moneyView === 'plan') return h + vBudget();
+  const BT = budgetTotal();
   const total = S.expenses.reduce((a, e) => a + toKRW(num(e.amount), e.cur), 0);
   const byCur = {}; S.expenses.forEach(e => byCur[e.cur] = (byCur[e.cur] || 0) + num(e.amount));
   const byCat = {}; S.expenses.forEach(e => byCat[e.cat] = (byCat[e.cat] || 0) + toKRW(num(e.amount), e.cur));
@@ -413,7 +479,7 @@ function vMoney() {
   const card = S.expenses.filter(e => e.pay !== 'cash').reduce((a, e) => a + toKRW(num(e.amount), e.cur), 0);
   h += `<div class="sec"><div class="card"><div class="sub">총 지출</div><div class="money-big">${fmtKRW(total)}</div>
     <div class="sub" style="margin-top:4px">${Object.entries(byCur).map(([c, v]) => fmtCur(Math.round(v * 100) / 100, c)).join(' + ') || '아직 기록이 없어요'}</div>
-    ${st.budget > 0 ? `<div class="bar"><i style="width:${Math.min(100, total / st.budget * 100)}%;background:${total > st.budget ? 'var(--red)' : 'var(--blue)'}"></i></div><div class="sub" style="margin-top:8px">예산 ${fmtKRW(st.budget)} 중 ${Math.round(total / st.budget * 100)}% · ${total > st.budget ? fmtKRW(total - st.budget) + ' 초과' : fmtKRW(st.budget - total) + ' 남음'}</div>` : ''}
+    ${BT > 0 ? `<div class="bar"><i style="width:${Math.min(100, total / BT * 100)}%;background:${total > BT ? 'var(--red)' : 'var(--blue)'}"></i></div><div class="sub" style="margin-top:8px">예산 ${fmtKRW(BT)} 중 ${Math.round(total / BT * 100)}% · ${total > BT ? fmtKRW(total - BT) + ' 초과' : fmtKRW(BT - total) + ' 남음'}</div>` : ''}
     ${cats.length ? `<div class="bar">${cats.map(([k, v]) => `<i style="width:${v / total * 100}%;background:${(CATS[k] || CATS.etc).c}"></i>`).join('')}</div>
     <div class="legend">${cats.map(([k, v]) => `<div class="row"><span class="dot" style="background:${(CATS[k] || CATS.etc).c}"></span><span class="x">${ECATS[k] || '기타'}</span><b>${fmtKRW(v)}</b><span class="p">${Math.round(v / total * 100)}%</span></div>`).join('')}</div>
     <div class="sub" style="margin-top:14px">카드 ${fmtKRW(card)} · 현금 ${fmtKRW(total - card)} · 환율 $1=${num(st.rates.USD).toLocaleString()}원</div>` : ''}
@@ -451,8 +517,6 @@ function tipCalc() {
 function expForm(e, preset) {
   const isNew = !e;
   e = e ? { ...e } : Object.assign({ id: uid(), date: todayStr(), amount: '', cur: S.settings.cur || 'USD', cat: 'food', pay: 'card', memo: '', placeId: '' }, preset || {});
-  const CURS = { USD: { n: '$ 달러' }, CAD: { n: 'C$ 캐나다' }, KRW: { n: '₩ 원' } };
-  const ECO = Object.fromEntries(Object.entries(ECATS).map(([k, n]) => [k, { n, c: CATS[k].c, i: CATS[k].i }]));
   sheet({
     title: isNew ? '지출 기록' : '지출 수정',
     body: `<div class="f"><input class="in amt" id="fAmt" inputmode="decimal" placeholder="0" value="${esc(e.amount)}"><div class="coord" id="fKRW"></div></div>
@@ -502,14 +566,37 @@ async function onFiles(files) {
     try {
       const id = await storeImage(f);
       if (tgt && tgt.kind === 'book') { tgt.draft.imgs.push(id); tgt.fresh.push(id); }
+      else if (tgt && tgt.kind === 'map') S.maps.push({ id, title: (f.name || '').replace(/\.[^.]+$/, '').slice(0, 30) || `지도 ${S.maps.length + 1}`, memo: '' });
       else S.photos.push({ id, date: f.lastModified ? dstr(new Date(f.lastModified)) : todayStr(), caption: '', placeId: (tgt && tgt.placeId) || '' });
       ok++;
     } catch (e) { }
   }
   save();
   if (tgt && tgt.kind === 'book') { renderBookImgs(tgt.draft); }
+  else if (tgt && tgt.kind === 'map') refreshMapImgs();
   else render();
   toast(ok === files.length ? `${ok}장 추가했어요` : `${ok}장 추가 · ${files.length - ok}장은 열 수 없는 형식이에요`);
+}
+function mapImgsHTML() {
+  if (!S.maps.length) return empty('넣은 지도가 없어요', '구글맵 캡처, CES 부스 배치도, 지하철 노선도처럼<br>인터넷 없이도 볼 지도를 넣어두세요');
+  return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${S.maps.map(m => `<button data-a="mapimg-open" data-id="${m.id}" style="text-align:left"><img data-thumb="${m.id}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:16px;background:var(--line);display:block"><div style="font-size:14px;font-weight:600;margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.title)}</div></button>`).join('')}</div>`;
+}
+function mapImgsSheet() {
+  sheet({
+    title: '내 지도',
+    body: `<div class="sub" style="margin-bottom:14px">오프라인에서도 볼 수 있어요. 두 손가락으로 확대돼요</div><div id="mapImgs">${mapImgsHTML()}</div>`,
+    foot: `<button class="btn big pri" data-a="mapimg-add">${ico('plus', 'i s')}지도 사진 넣기</button>`,
+  });
+}
+function refreshMapImgs() { const el = $('#mapImgs'); if (el) { el.innerHTML = mapImgsHTML(); hydrate(el); } }
+function mapImgEdit(id) {
+  const m = byId('maps', id); if (!m) return;
+  sheet({
+    title: '지도 이름',
+    body: `<div class="f"><input class="in" id="fTitle" value="${esc(m.title)}"></div><div class="f"><label>메모</label><textarea class="in" id="fMemo">${esc(m.memo || '')}</textarea></div>`,
+    foot: `<button class="btn big pri" data-a="sheet-ok">저장</button>`,
+    ok: () => { m.title = $('#fTitle').value.trim() || m.title; m.memo = $('#fMemo').value.trim(); save(); viewerShow(); refreshMapImgs(); },
+  });
 }
 function photoEdit(id) {
   const p = byId('photos', id); if (!p) return;
@@ -585,9 +672,11 @@ function confirmSheet(msg, sub, yes, onYes) {
 
 /* ============ sheet ============ */
 const sheets = [];
+let zTop = 100;
 function sheet(o) {
   const lay = document.createElement('div'); lay.className = 'lay';
   lay.innerHTML = `<div class="dim" data-a="sheet-close"></div><div class="sheet"><div class="grab"></div><div class="sh-h"><h2>${esc(o.title)}</h2><button class="ib" style="color:var(--t3);width:36px;height:36px;display:grid;place-items:center" data-a="sheet-close">${ico('x')}</button></div><div class="sh-b">${o.body}</div>${o.foot ? `<div class="sh-f">${o.foot}</div>` : ''}</div>`;
+  lay.style.zIndex = ++zTop;
   $('#ov').appendChild(lay);
   o.el = lay; sheets.push(o);
   requestAnimationFrame(() => requestAnimationFrame(() => lay.classList.add('on')));
@@ -620,7 +709,7 @@ function settingsSheet() {
       <div class="f"><label>경로 (· 로 구분)</label><input class="in" data-set="route" value="${esc(st.route)}"></div>
       <div class="f two"><div><label>시작일</label><input class="in" type="date" data-set="start" value="${esc(st.start)}"></div><div><label>종료일</label><input class="in" type="date" data-set="end" value="${esc(st.end)}"></div></div>
       <div class="f two"><div><label>1달러 = 원</label><input class="in" inputmode="decimal" data-rate="USD" value="${esc(st.rates.USD)}"></div><div><label>1캐나다달러 = 원</label><input class="in" inputmode="decimal" data-rate="CAD" value="${esc(st.rates.CAD)}"></div></div>
-      <div class="f"><label>총 예산 (원)</label><input class="in" inputmode="numeric" data-set="budget" value="${st.budget || ''}" placeholder="예: 2000000"></div>
+      ${S.budget.length ? '' : `<div class="f"><label>총 예산 (원) · 경비 → 예산 짜기에서 항목별로도 짤 수 있어요</label><input class="in" inputmode="numeric" data-set="budget" value="${st.budget || ''}" placeholder="예: 2000000"></div>`}
       <div class="f"><label>기능 켜기·끄기·순서 <span style="font-weight:400">(앞의 4개가 아래 탭에 나와요)</span></label><div class="list" id="modList" style="background:var(--card2)">${modRows()}</div></div>
       <div class="f"><label>화면</label><div class="seg">${[['auto', '자동'], ['light', '라이트'], ['dark', '다크']].map(([k, n]) => `<button class="${st.theme === k ? 'on' : ''}" data-a="theme" data-k="${k}">${n}</button>`).join('')}</div></div>
       <div class="f"><label>데이터</label><div class="btns" style="margin-top:0"><button class="btn" data-a="export">백업 내보내기</button><button class="btn" data-a="import">백업 불러오기</button></div>
@@ -794,7 +883,7 @@ function locateMe(cb) {
 
 /* ============ viewer ============ */
 const V = { list: [], i: 0, ctx: null, s: 1, x: 0, y: 0 };
-function openViewer(list, i, ctx) { V.list = list; V.i = i; V.ctx = ctx; $('#viewer').classList.add('on'); viewerShow(); }
+function openViewer(list, i, ctx) { V.list = list; V.i = i; V.ctx = ctx; $('#viewer').style.zIndex = ++zTop; $('#viewer').classList.add('on'); viewerShow(); }
 function closeViewer() { $('#viewer').classList.remove('on'); $('#vImg').src = ''; }
 async function viewerShow() {
   if (!V.list.length) { closeViewer(); return; }
@@ -802,11 +891,13 @@ async function viewerShow() {
   const id = V.list[V.i]; V.s = 1; V.x = 0; V.y = 0; vApply();
   const img = $('#vImg'); img.src = await imgURL(id, true) || await imgURL(id);
   const p = V.ctx === 'photo' ? byId('photos', id) : null;
-  $('#vEdit').style.display = p ? '' : 'none';
+  const mp = V.ctx === 'map' ? byId('maps', id) : null;
+  $('#vEdit').style.display = p || mp ? '' : 'none';
   const pl = p && p.placeId ? byId('places', p.placeId) : null;
-  $('#vTitle').textContent = p ? (p.date ? fmtD(p.date) : '날짜 없음') : '티켓·캡처';
+  $('#vTitle').textContent = mp ? mp.title : p ? (p.date ? fmtD(p.date) : '날짜 없음') : '티켓·캡처';
   $('#vSub').textContent = `${V.i + 1} / ${V.list.length}${pl ? ' · ' + pl.name : ''}`;
-  $('#vCap').textContent = p ? p.caption : ''; $('#vCap').style.display = p && p.caption ? '' : 'none';
+  const cap = p ? p.caption : mp ? mp.memo : '';
+  $('#vCap').textContent = cap || ''; $('#vCap').style.display = cap ? '' : 'none';
 }
 function vApply() { $('#vImg').style.transform = `translate(${V.x}px,${V.y}px) scale(${V.s})`; }
 (function viewerGestures() {
@@ -882,6 +973,21 @@ const A = {
     const el = document.createElement('div'); el.style.cssText = 'width:18px;height:18px;border-radius:50%;background:#3182F6;border:3px solid #fff;box-shadow:0 0 0 6px rgba(49,130,246,.25)';
     meMarker = new maplibregl.Marker({ element: el }).setLngLat([ln, la]).addTo(map); map.flyTo({ center: [ln, la], zoom: 15 });
   }),
+  'map-imgs': () => mapImgsSheet(),
+  'mapimg-add': () => pickFiles({ kind: 'map' }),
+  'mapimg-open': el => { const ids = S.maps.map(m => m.id); openViewer(ids, ids.indexOf(el.dataset.id), 'map'); },
+  mview: el => { ui.moneyView = el.dataset.k; render(); },
+  'bud-add': () => budForm(),
+  'bud-edit': el => budForm(byId('budget', el.dataset.id)),
+  'bud-del': el => confirmSheet('예산 항목을 삭제할까요?', '되돌릴 수 없어요', '삭제', () => { S.budget = S.budget.filter(x => x.id !== el.dataset.id); save(); closeSheet(true); render(); }),
+  'bud-template': () => { S.budget = BUD_TEMPLATE.map(([cat, title]) => ({ id: uid(), title, cat, amount: 0, cur: 'KRW', memo: '', paid: false })); save(); render(); toast('항목을 눌러 금액을 넣어주세요'); },
+  'bud-toexp': el => {
+    const b = byId('budget', el.dataset.id); const a = num($('#fAmt').value) || num(b.amount);
+    if (!a) { toast('금액을 먼저 넣어주세요'); return; }
+    b.paid = true; b.amount = a; b.cur = pickVal('fCur') || b.cur;
+    S.expenses.push({ id: uid(), date: todayStr(), amount: a, cur: b.cur, cat: b.cat, pay: 'card', memo: b.title, placeId: '' });
+    save(); closeSheet(); render(); toast('지출로 기록했어요');
+  },
   'map-pinmode': () => { pending = null; setPinMode(!pinMode); },
   'mcard-x': () => hideMcard(),
   'mres-pick': el => mresPick(+el.dataset.i),
@@ -901,11 +1007,12 @@ const A = {
     const ids = list.map(p => p.id); openViewer(ids, ids.indexOf(el.dataset.id), 'photo');
   },
   'v-close': () => closeViewer(),
-  'v-edit': () => photoEdit(V.list[V.i]),
+  'v-edit': () => V.ctx === 'map' ? mapImgEdit(V.list[V.i]) : photoEdit(V.list[V.i]),
   'v-del': () => {
     const id = V.list[V.i];
     confirmSheet('사진을 삭제할까요?', '앱에서만 지워지고 갤러리 원본은 그대로예요', '삭제', () => {
       if (V.ctx === 'photo') S.photos = S.photos.filter(p => p.id !== id);
+      else if (V.ctx === 'map') { S.maps = S.maps.filter(m => m.id !== id); setTimeout(refreshMapImgs); }
       else { const b = byId('bookings', V.ctx); if (b) b.imgs = b.imgs.filter(i => i !== id); }
       removeImage(id); save(); V.list.splice(V.i, 1); render(); viewerShow();
     });
