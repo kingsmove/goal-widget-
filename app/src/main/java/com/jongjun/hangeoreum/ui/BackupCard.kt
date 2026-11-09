@@ -64,7 +64,7 @@ fun BackupCard() {
             }
             PrimaryButton("백업 저장", Modifier.weight(1f)) {
                 (ctx as? MainActivity)?.expectExternal()
-                runCatching { saver.launch("UFP-backup-${LocalDate.now()}.json") }
+                runCatching { saver.launch("UFK-backup-${LocalDate.now()}.json") }
             }
         }
     }

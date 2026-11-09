@@ -23,15 +23,15 @@ jobs:
       - name: Build release APK
         run: gradle assembleRelease --stacktrace
       - name: Rename APK
-        run: cp app/build/outputs/apk/release/app-release.apk UFP-${{ github.run_number }}.apk
+        run: cp app/build/outputs/apk/release/app-release.apk UFK-${{ github.run_number }}.apk
       - uses: actions/upload-artifact@v4
         with:
           name: hangeoreum-apk
-          path: UFP-*.apk
+          path: UFK-*.apk
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: UFP 1.${{ github.run_number }}
+          name: UFK 1.${{ github.run_number }}
           make_latest: true
-          files: UFP-*.apk
+          files: UFK-*.apk

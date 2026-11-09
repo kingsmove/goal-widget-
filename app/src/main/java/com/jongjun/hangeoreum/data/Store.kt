@@ -276,7 +276,7 @@ object Store {
 
     private fun fromJson(text: String): AppData {
         val root = JSONObject(text)
-        if (!root.has("goals") && !root.has("events")) error("UFP 백업 파일이 아니에요")
+        if (!root.has("goals") && !root.has("events")) error("UFK 백업 파일이 아니에요")
         val goals = root.optJSONArray("goals")?.let { arr ->
             (0 until arr.length()).map { i ->
                 val o = arr.getJSONObject(i)

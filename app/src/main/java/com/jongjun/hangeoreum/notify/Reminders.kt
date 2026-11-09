@@ -79,7 +79,7 @@ object Reminders {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = ctx.getSystemService(NotificationManager::class.java) ?: return
             if (nm.getNotificationChannel(CHANNEL) == null) {
-                nm.createNotificationChannel(NotificationChannel(CHANNEL, "UFP 알림", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                nm.createNotificationChannel(NotificationChannel(CHANNEL, "UFK 알림", NotificationManager.IMPORTANCE_DEFAULT).apply {
                     description = "일정, D-day, 오늘 할 일 알림"
                 })
             }

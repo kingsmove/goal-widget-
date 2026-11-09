@@ -82,7 +82,7 @@ fun ExcelCard(data: AppData) {
         Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SecondaryButton("양식 저장", Modifier.weight(1f)) {
                 (ctx as? MainActivity)?.expectExternal()
-                runCatching { saver.launch("UFP_양식.xlsx") }
+                runCatching { saver.launch("UFK_양식.xlsx") }
             }
             PrimaryButton("엑셀 업로드", Modifier.weight(1f)) {
                 (ctx as? MainActivity)?.expectExternal()
