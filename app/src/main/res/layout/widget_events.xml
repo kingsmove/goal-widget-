@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/ev_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="16dp">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <TextView
+            android:id="@+id/ev_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:fontFamily="@font/pretendard_bold"
+            android:textColor="@color/w_text"
+            android:textSize="15sp"
+            android:text="다가오는 일정" />
+        <TextView
+            android:id="@+id/ev_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/pretendard_bold"
+            android:textColor="@color/brand"
+            android:textSize="14sp"
+            android:text="" />
+    </LinearLayout>
+    <TextView
+        android:id="@+id/ev_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:fontFamily="@font/pretendard_medium"
+        android:textColor="@color/w_sub"
+        android:textSize="14sp"
+        android:text="예정된 일정이 없어요"
+        android:layout_marginTop="10dp"
+        android:visibility="gone" />
+    <LinearLayout
+        android:id="@+id/ev_row1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <TextView
+            android:id="@+id/ev_date1"
+            android:layout_width="72dp"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/pretendard_semibold"
+            android:textColor="@color/brand"
+            android:textSize="12sp"
+            android:text="11/12 (목)" />
+        <TextView
+            android:id="@+id/ev_txt1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:fontFamily="@font/pretendard_medium"
+            android:textColor="@color/w_text"
+            android:textSize="14sp"
+            android:text="일정" />
+        <TextView
+            android:id="@+id/ev_time1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:fontFamily="@font/pretendard_regular"
+            android:textColor="@color/w_sub"
+            android:textSize="12sp"
+            android:text="오후 7시" />
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/ev_row2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <TextView
+            android:id="@+id/ev_date2"
+            android:layout_width="72dp"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/pretendard_semibold"
+            android:textColor="@color/brand"
+            android:textSize="12sp"
+            android:text="11/12 (목)" />
+        <TextView
+            android:id="@+id/ev_txt2"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:fontFamily="@font/pretendard_medium"
+            android:textColor="@color/w_text"
+            android:textSize="14sp"
+            android:text="일정" />
+        <TextView
+            android:id="@+id/ev_time2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:fontFamily="@font/pretendard_regular"
+            android:textColor="@color/w_sub"
+            android:textSize="12sp"
+            android:text="오후 7시" />
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/ev_row3"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <TextView
+            android:id="@+id/ev_date3"
+            android:layout_width="72dp"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/pretendard_semibold"
+            android:textColor="@color/brand"
+            android:textSize="12sp"
+            android:text="11/12 (목)" />
+        <TextView
+            android:id="@+id/ev_txt3"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:fontFamily="@font/pretendard_medium"
+            android:textColor="@color/w_text"
+            android:textSize="14sp"
+            android:text="일정" />
+        <TextView
+            android:id="@+id/ev_time3"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:fontFamily="@font/pretendard_regular"
+            android:textColor="@color/w_sub"
+            android:textSize="12sp"
+            android:text="오후 7시" />
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/ev_row4"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <TextView
+            android:id="@+id/ev_date4"
+            android:layout_width="72dp"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/pretendard_semibold"
+            android:textColor="@color/brand"
+            android:textSize="12sp"
+            android:text="11/12 (목)" />
+        <TextView
+            android:id="@+id/ev_txt4"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:fontFamily="@font/pretendard_medium"
+            android:textColor="@color/w_text"
+            android:textSize="14sp"
+            android:text="일정" />
+        <TextView
+            android:id="@+id/ev_time4"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:fontFamily="@font/pretendard_regular"
+            android:textColor="@color/w_sub"
+            android:textSize="12sp"
+            android:text="오후 7시" />
+    </LinearLayout>
+</LinearLayout>

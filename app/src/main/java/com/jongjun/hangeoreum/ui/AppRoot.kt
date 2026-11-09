@@ -68,7 +68,7 @@ class Nav(
 )
 
 @Composable
-fun AppRoot(resumeTick: Int, openOverlaySettings: () -> Unit) {
+fun AppRoot(resumeTick: Int, openOverlaySettings: () -> Unit, tabRequest: Pair<Int, Long>? = null) {
     val data by Store.data.collectAsState()
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var stack by remember { mutableStateOf(listOf<String>()) }
@@ -100,6 +100,10 @@ fun AppRoot(resumeTick: Int, openOverlaySettings: () -> Unit) {
     }
 
     BackHandler(enabled = stack.isNotEmpty()) { stack = stack.dropLast(1) }
+
+    LaunchedEffect(tabRequest) {
+        tabRequest?.let { (t, _) -> tab = t; stack = emptyList() }
+    }
 
     // check GitHub for a newer build once per launch
     val ctx = LocalContext.current

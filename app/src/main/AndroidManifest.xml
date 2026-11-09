@@ -37,6 +37,70 @@
                 android:resource="@xml/goal_widget_info" />
         </receiver>
 
+        <receiver
+            android:name=".widget.TodoWidget"
+            android:exported="true"
+            android:label="@string/wn_todo">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_todo_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.TimerWidget"
+            android:exported="true"
+            android:label="@string/wn_timer">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_timer_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.DdayWidget"
+            android:exported="true"
+            android:label="@string/wn_dday">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_dday_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.GoalsWidget"
+            android:exported="true"
+            android:label="@string/wn_goals">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_goals_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.EventsWidget"
+            android:exported="true"
+            android:label="@string/wn_events">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_events_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.WidgetActions"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"

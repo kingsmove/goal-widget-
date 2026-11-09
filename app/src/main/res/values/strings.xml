@@ -2,4 +2,14 @@
     <string name="app_name">UFP</string>
     <string name="widget_name">오늘의 목표</string>
     <string name="widget_desc">오늘 할 일, 달성률, 공부 시간, 다음 일정</string>
+    <string name="wn_todo">오늘 할 일</string>
+    <string name="wd_todo">체크하면 바로 완료되는 오늘 할 일 목록</string>
+    <string name="wn_timer">공부 타이머</string>
+    <string name="wd_timer">홈 화면에서 바로 시작·일시정지</string>
+    <string name="wn_dday">D-day</string>
+    <string name="wd_dday">가장 가까운 시험·마감·목표까지 남은 날</string>
+    <string name="wn_goals">목표 진행률</string>
+    <string name="wd_goals">연간·월간·주간 목표 달성률</string>
+    <string name="wn_events">다가오는 일정</string>
+    <string name="wd_events">앞으로 있을 일정 4개</string>
 </resources>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/dd_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="14dp">
+    <TextView
+        android:id="@+id/dd_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:fontFamily="@font/pretendard_medium"
+        android:textColor="@color/w_sub"
+        android:textSize="12sp"
+        android:text="다가오는 D-day" />
+    <TextView
+        android:id="@+id/dd_big"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:fontFamily="@font/pretendard_bold"
+        android:textColor="@color/brand"
+        android:textSize="34sp"
+        android:text="D-23" />
+    <TextView
+        android:id="@+id/dd_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+                android:fontFamily="@font/pretendard_bold"
+        android:textColor="@color/w_text"
+        android:textSize="15sp"
+        android:text="건축기사 실기"
+        android:maxLines="2" />
+    <TextView
+        android:id="@+id/dd_date"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:fontFamily="@font/pretendard_medium"
+        android:textColor="@color/w_sub"
+        android:textSize="12sp"
+        android:text="11월 7일 (토)" />
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+    <TextView
+        android:id="@+id/dd_next"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:fontFamily="@font/pretendard_medium"
+        android:textColor="@color/w_sub"
+        android:textSize="12sp"
+        android:text="다음 · 토익 D-33" />
+</LinearLayout>

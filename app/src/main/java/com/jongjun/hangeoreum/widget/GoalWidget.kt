@@ -59,7 +59,7 @@ class GoalWidget : AppWidgetProvider() {
             }
         }
 
-        private fun build(context: Context): RemoteViews {
+        fun build(context: Context): RemoteViews {
             val d = Store.current
             val today = Dates.today()
             val now = System.currentTimeMillis()

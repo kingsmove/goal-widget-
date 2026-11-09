@@ -18,22 +18,40 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import com.jongjun.hangeoreum.ui.isDarkFor
 import com.jongjun.hangeoreum.data.Store
 import com.jongjun.hangeoreum.focus.FocusGuard
 import com.jongjun.hangeoreum.ui.AppRoot
 import com.jongjun.hangeoreum.ui.AppTheme
-import com.jongjun.hangeoreum.widget.GoalWidget
+import com.jongjun.hangeoreum.widget.WidgetKit
 
 class MainActivity : ComponentActivity() {
 
     private val resumeTick = mutableIntStateOf(0)
+    /** (tab, nonce) requested by a widget tap. */
+    private val tabRequest = mutableStateOf<Pair<Int, Long>?>(null)
+
+    companion object {
+        const val EXTRA_TAB = "tab"
+    }
+
+    private fun readTab(intent: Intent?) {
+        val t = intent?.getIntExtra(EXTRA_TAB, -1) ?: -1
+        if (t >= 0) tabRequest.value = t to System.nanoTime()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        readTab(intent)
+    }
     private val handler = Handler(Looper.getMainLooper())
     private var started = false
     private var suppressGuard = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        readTab(intent)
         enableEdgeToEdge()
         setContent {
             val data by Store.data.collectAsState()
@@ -48,7 +66,7 @@ class MainActivity : ComponentActivity() {
                 onDispose { }
             }
             AppTheme(data.theme) {
-                AppRoot(resumeTick.intValue, ::openOverlaySettings)
+                AppRoot(resumeTick.intValue, ::openOverlaySettings, tabRequest.value)
             }
         }
     }
@@ -64,7 +82,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         resumeTick.intValue++
-        GoalWidget.refresh(this)
+        WidgetKit.refreshAll(this)
     }
 
     override fun onStop() {

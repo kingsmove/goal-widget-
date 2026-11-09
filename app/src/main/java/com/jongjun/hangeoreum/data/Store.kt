@@ -27,7 +27,7 @@ object Store {
         val next = block(_data.value)
         _data.value = next
         runCatching { save(next) }
-        runCatching { GoalWidget.refresh(app) }
+        runCatching { com.jongjun.hangeoreum.widget.WidgetKit.refreshAll(app) }
     }
 
     // ---------- Goals ----------
