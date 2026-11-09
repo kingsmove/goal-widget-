@@ -25,6 +25,12 @@ val DefaultItemColors = listOf(
     Color(0xFFFF8A3D), // 주황
     Color(0xFF03B26C), // 초록
     Color(0xFFF25C8A), // 분홍
+    Color(0xFFF04452), // 빨강
+    Color(0xFFFFC342), // 노랑
+    Color(0xFF1B64DA), // 남색
+    Color(0xFF7AC74F), // 연두
+    Color(0xFFA0704C), // 갈색
+    Color(0xFF6B7684), // 회색
 )
 
 val DefaultYearColors = listOf(
@@ -120,8 +126,11 @@ fun itemColor(i: Int): Color {
 }
 
 @Composable
-fun goalColor(g: Goal): Color =
-    if (g.color >= 0) itemColor(g.color) else LocalPalette.current.levelColors[g.level.ordinal]
+fun goalColor(g: Goal): Color = when {
+    g.customColor != null -> Color(g.customColor)
+    g.color >= 0 -> itemColor(g.color)
+    else -> LocalPalette.current.levelColors[g.level.ordinal]
+}
 
 val Pretendard = FontFamily(
     Font(R.font.pretendard_regular, FontWeight.Normal),

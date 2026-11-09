@@ -21,6 +21,8 @@ data class Goal(
     val createdAt: Long,
     /** -1 = use the level color, otherwise index into the item palette. */
     val color: Int = -1,
+    /** Exact ARGB color picked freely; overrides [color]. */
+    val customColor: Int? = null,
 )
 
 /** What an event is, for the resume view. color = canvas-style default color. */
@@ -88,7 +90,7 @@ data class ThemePrefs(
     val bgDark: Int? = null,
     val cardDark: Int? = null,
     val textDark: Int? = null,
-    val itemColors: List<Int?> = List(6) { null },
+    val itemColors: List<Int?> = List(12) { null },
     val yearColors: List<Int?> = List(5) { null },
     val levelColors: List<Int?> = List(4) { null },
 )

@@ -107,6 +107,27 @@ object Store {
     private val file: File get() = File(app.filesDir, "data.json")
 
     private fun save(d: AppData) {
+        val text = toJson(d)
+        val tmp = File(app.filesDir, "data.json.tmp")
+        tmp.writeText(text)
+        if (!tmp.renameTo(file)) {
+            file.writeText(text)
+            tmp.delete()
+        }
+    }
+
+    /** Full data as JSON (also the backup file format). */
+    fun exportJson(): String = toJson(_data.value)
+
+    /** Replaces everything with a backup. The current data is kept as data.before-restore.json. */
+    fun importJson(text: String): Result<AppData> = runCatching {
+        val d = fromJson(text)
+        runCatching { file.copyTo(File(app.filesDir, "data.before-restore.json"), overwrite = true) }
+        update { d }
+        d
+    }
+
+    private fun toJson(d: AppData): String {
         val root = JSONObject()
         root.put("v", 1)
         root.put("focusGuard", d.focusGuard)
@@ -117,6 +138,7 @@ object Store {
                     put("parentId", g.parentId ?: JSONObject.NULL)
                     put("start", g.startDay); put("end", g.endDay); put("done", g.done)
                     put("memo", g.memo); put("createdAt", g.createdAt); put("color", g.color)
+                    put("cc", g.customColor ?: JSONObject.NULL)
                 })
             }
         })
@@ -152,12 +174,7 @@ object Store {
             put("years", JSONArray().apply { th.yearColors.forEach { put(it ?: JSONObject.NULL) } })
             put("levels", JSONArray().apply { th.levelColors.forEach { put(it ?: JSONObject.NULL) } })
         })
-        val tmp = File(app.filesDir, "data.json.tmp")
-        tmp.writeText(root.toString())
-        if (!tmp.renameTo(file)) {
-            file.writeText(root.toString())
-            tmp.delete()
-        }
+        return root.toString()
     }
 
     private fun JSONObject.putC(key: String, v: Int?) {
@@ -173,7 +190,15 @@ object Store {
 
     private fun load(): AppData {
         if (!file.exists()) return AppData()
-        val root = JSONObject(file.readText())
+        val text = file.readText()
+        // keep a copy of what was there when the app last started
+        runCatching { File(app.filesDir, "data.prev.json").writeText(text) }
+        return fromJson(text)
+    }
+
+    private fun fromJson(text: String): AppData {
+        val root = JSONObject(text)
+        if (!root.has("goals") && !root.has("events")) error("UFP 백업 파일이 아니에요")
         val goals = root.optJSONArray("goals")?.let { arr ->
             (0 until arr.length()).map { i ->
                 val o = arr.getJSONObject(i)
@@ -188,6 +213,7 @@ object Store {
                     memo = o.optString("memo", ""),
                     createdAt = o.optLong("createdAt"),
                     color = o.optInt("color", -1),
+                    customColor = o.optC("cc"),
                 )
             }
         } ?: emptyList()
@@ -230,7 +256,7 @@ object Store {
             accent = tj.optC("accent"),
             bgLight = tj.optC("bgLight"), cardLight = tj.optC("cardLight"), textLight = tj.optC("textLight"),
             bgDark = tj.optC("bgDark"), cardDark = tj.optC("cardDark"), textDark = tj.optC("textDark"),
-            itemColors = tj.optJSONArray("items").colors(6),
+            itemColors = tj.optJSONArray("items").colors(12),
             yearColors = tj.optJSONArray("years").colors(5),
             levelColors = tj.optJSONArray("levels").colors(4),
         )

@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.jongjun.hangeoreum.data.AppData
@@ -71,6 +72,7 @@ fun GoalEditorSheet(req: GoalEditReq, data: AppData, onDismiss: () -> Unit) {
     var memo by remember { mutableStateOf(existing?.memo ?: "") }
     var level by remember { mutableStateOf(if (req.level in levels) req.level else levels.first()) }
     var gColor by remember { mutableIntStateOf(existing?.color ?: -1) }
+    var gCustom by remember { mutableStateOf(existing?.customColor) }
     var anchor by remember {
         mutableStateOf(existing?.let { Dates.date(it.endDay) } ?: LocalDate.now())
     }
@@ -124,17 +126,9 @@ fun GoalEditorSheet(req: GoalEditReq, data: AppData, onDismiss: () -> Unit) {
             }
 
             FieldLabel("색상")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                ChoiceChip("기본", gColor < 0) { gColor = -1 }
-                pal.itemColors.forEachIndexed { i, c ->
-                    androidx.compose.foundation.layout.Box(
-                        Modifier.size(28.dp).clip(CircleShape).background(c).bounceClick { gColor = i },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (i == gColor) Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                    }
-                }
-            }
+            ColorChooser(gColor, gCustom, allowDefault = true,
+                onIndex = { gColor = it; gCustom = null },
+                onCustom = { gCustom = it })
 
             FieldLabel("메모 (선택)")
             InputField(memo, { memo = it }, "예: 기출 3회차까지", size = 16, singleLine = false)
@@ -144,7 +138,7 @@ fun GoalEditorSheet(req: GoalEditReq, data: AppData, onDismiss: () -> Unit) {
                 val (s, e) = Dates.range(level, anchor)
                 val goal = if (existing != null) {
                     existing.copy(
-                        title = title.trim(), memo = memo.trim(), level = level, endDay = e, color = gColor,
+                        title = title.trim(), memo = memo.trim(), level = level, endDay = e, color = gColor, customColor = gCustom,
                         startDay = if (existing.startDay <= e && existing.level == level &&
                             (level == Level.YEAR || level == Level.MONTH)) existing.startDay else s,
                     )
@@ -152,6 +146,7 @@ fun GoalEditorSheet(req: GoalEditReq, data: AppData, onDismiss: () -> Unit) {
                     id = Store.newId(), title = title.trim(), level = level, parentId = req.parentId,
                     startDay = s, endDay = e, done = false, memo = memo.trim(), createdAt = System.currentTimeMillis(),
                     color = gColor,
+                    customColor = gCustom,
                 )
                 Store.upsertGoal(goal)
                 close()
@@ -270,16 +265,9 @@ fun EventEditorSheet(req: EventEditReq, onDismiss: () -> Unit) {
             }
 
             FieldLabel("색상")
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                pal.itemColors.forEachIndexed { i, c ->
-                    androidx.compose.foundation.layout.Box(
-                        Modifier.size(34.dp).clip(CircleShape).background(c).bounceClick { color = i; custom = null },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (i == color && custom == null) Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
-                    }
-                }
-            }
+            ColorChooser(color, custom, allowDefault = false,
+                onIndex = { color = it; custom = null },
+                onCustom = { custom = it })
 
             Row(Modifier.padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -378,4 +366,48 @@ fun EventEditorSheet(req: EventEditReq, onDismiss: () -> Unit) {
 private fun fullDate(day: Long): String {
     val d = Dates.date(day)
     return if (d.year == LocalDate.now().year) Dates.full(day) else "${d.year}. ${Dates.full(day)}"
+}
+
+/** 12 palette swatches + any custom color, in a scrollable row. */
+@Composable
+fun ColorChooser(
+    index: Int,
+    custom: Int?,
+    allowDefault: Boolean,
+    onIndex: (Int) -> Unit,
+    onCustom: (Int) -> Unit,
+) {
+    var picking by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (allowDefault) ChoiceChip("기본", index < 0 && custom == null) { onIndex(-1) }
+        if (custom != null) {
+            androidx.compose.foundation.layout.Box(
+                Modifier.size(34.dp).clip(CircleShape).background(Color(custom)).bounceClick { picking = true },
+                contentAlignment = Alignment.Center,
+            ) { Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(20.dp)) }
+        }
+        pal.itemColors.forEachIndexed { i, c ->
+            androidx.compose.foundation.layout.Box(
+                Modifier.size(34.dp).clip(CircleShape).background(c).bounceClick { onIndex(i) },
+                contentAlignment = Alignment.Center,
+            ) {
+                if (i == index && custom == null) Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
+            }
+        }
+        androidx.compose.foundation.layout.Box(
+            Modifier.size(34.dp).clip(CircleShape).background(pal.fill).bounceClick { picking = true },
+            contentAlignment = Alignment.Center,
+        ) { T("+", 18, weight = FontWeight.Bold, color = pal.sub) }
+    }
+    if (picking) {
+        val start = custom?.let { Color(it) } ?: pal.itemColors.getOrElse(index) { pal.blue }
+        ColorPickerSheet("직접 고르기", start, isDefault = true, onDismiss = { picking = false }) { picked ->
+            if (picked != null) onCustom(picked.toArgb())
+            picking = false
+        }
+    }
 }

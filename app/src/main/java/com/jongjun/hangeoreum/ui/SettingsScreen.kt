@@ -141,13 +141,20 @@ fun SettingsScreen(data: AppData, onBack: () -> Unit, update: UpdateInfo?, onUpd
             item {
                 CardBox {
                     SectionTitle("일정·목표 팔레트")
-                    SwatchLine(p.itemColors) { i ->
-                        val isDef = t.itemColors.getOrNull(i) == null
-                        target = PickTarget("팔레트 ${i + 1}번", p.itemColors[i], isDef) { th, c ->
-                            th.copy(itemColors = th.itemColors.toMutableList().also { l -> while (l.size < 6) l.add(null); l[i] = c })
+                    p.itemColors.chunked(6).forEachIndexed { row, colors ->
+                        Row(Modifier.padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            colors.forEachIndexed { j, c ->
+                                val i = row * 6 + j
+                                Swatch(c, 40) {
+                                    val isDef = t.itemColors.getOrNull(i) == null
+                                    target = PickTarget("팔레트 ${i + 1}번", c, isDef) { th, nc ->
+                                        th.copy(itemColors = th.itemColors.toMutableList().also { l -> while (l.size < 12) l.add(null); l[i] = nc })
+                                    }
+                                }
+                            }
                         }
                     }
-                    T("일정·목표 만들 때 고르는 6가지 색이에요. 바꾸면 그 색을 쓴 항목이 전부 바뀌어요", 12, Modifier.padding(top = 10.dp), color = p.sub)
+                    T("일정·목표 만들 때 바로 고르는 12가지 색이에요. 바꾸면 그 색을 쓴 항목이 전부 바뀌어요. 만들 때 ‘+’로 아무 색이나 직접 고를 수도 있어요", 12, Modifier.padding(top = 2.dp), color = p.sub)
                 }
             }
 
@@ -177,6 +184,8 @@ fun SettingsScreen(data: AppData, onBack: () -> Unit, update: UpdateInfo?, onUpd
                     Store.setTheme { ThemePrefs(mode = it.mode) }
                 }
             }
+
+            item { BackupCard() }
 
             item { CanvasImportCard(data) }
 
@@ -223,7 +232,7 @@ private fun SwatchLine(colors: List<Color>, onPick: (Int) -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ColorPickerSheet(
+fun ColorPickerSheet(
     title: String,
     initial: Color,
     isDefault: Boolean,
