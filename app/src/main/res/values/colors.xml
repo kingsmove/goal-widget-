@@ -1,0 +1,12 @@
+<resources>
+    <color name="brand">#3182F6</color>
+    <color name="window_bg">#F2F4F6</color>
+    <color name="w_bg">#FFFFFF</color>
+    <color name="w_text">#191F28</color>
+    <color name="w_sub">#8B95A1</color>
+    <color name="w_track">#E5E8EB</color>
+    <color name="ov_card">#FFFFFF</color>
+    <color name="ov_text">#191F28</color>
+    <color name="ov_sub">#6B7684</color>
+    <color name="ov_fill">#F2F4F6</color>
+</resources>

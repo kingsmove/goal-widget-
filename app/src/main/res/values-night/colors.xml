@@ -1,0 +1,11 @@
+<resources>
+    <color name="window_bg">#17171C</color>
+    <color name="w_bg">#202027</color>
+    <color name="w_text">#F2F2F4</color>
+    <color name="w_sub">#8F8F99</color>
+    <color name="w_track">#34343C</color>
+    <color name="ov_card">#202027</color>
+    <color name="ov_text">#F2F2F4</color>
+    <color name="ov_sub">#9E9EA6</color>
+    <color name="ov_fill">#2C2C35</color>
+</resources>
