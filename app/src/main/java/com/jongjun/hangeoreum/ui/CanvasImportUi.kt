@@ -2,8 +2,6 @@ package com.jongjun.hangeoreum.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -53,18 +51,11 @@ fun CanvasImportCard(data: AppData) {
             14, color = pal.sub,
         )
         status?.let { T(it, 14, Modifier.padding(top = 6.dp), weight = FontWeight.SemiBold, color = pal.blue) }
-        Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SecondaryButton("파일 선택", Modifier.weight(1f)) {
-                if (busy) return@SecondaryButton
-                busy = true; status = null
-                (ctx as? MainActivity)?.expectExternal()
-                runCatching { picker.launch(arrayOf("*/*")) }.onFailure { busy = false; status = "파일 선택 창을 열 수 없어요" }
-            }
-            PrimaryButton(if (busy) "가져오는 중…" else "PC에서 동기화", Modifier.weight(1f)) {
-                if (busy) return@PrimaryButton
-                busy = true; status = null
-                scope.launch { report(CanvasImport.fromRepo()) }
-            }
+        PrimaryButton(if (busy) "가져오는 중…" else "캔버스 파일 선택", Modifier.fillMaxWidth().padding(top = 14.dp)) {
+            if (busy) return@PrimaryButton
+            busy = true; status = null
+            (ctx as? MainActivity)?.expectExternal()
+            runCatching { picker.launch(arrayOf("*/*")) }.onFailure { busy = false; status = "파일 선택 창을 열 수 없어요" }
         }
         T(
             "다시 가져오면 옵시디언 항목만 새로 바뀌고, 앱에서 직접 만든 일정은 그대로예요", 12,
