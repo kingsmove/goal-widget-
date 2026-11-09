@@ -58,6 +58,7 @@ data class EventEditReq(
 )
 
 const val SETTINGS = "__settings"
+const val STATS = "__stats"
 
 class Nav(
     val openGoal: (String) -> Unit,
@@ -65,6 +66,7 @@ class Nav(
     val editEvent: (EventEditReq) -> Unit,
     val startTimerFor: (String?) -> Unit,
     val goTab: (Int) -> Unit,
+    val openStats: () -> Unit = {},
 )
 
 @Composable
@@ -96,6 +98,7 @@ fun AppRoot(resumeTick: Int, openOverlaySettings: () -> Unit, tabRequest: Pair<I
                 tab = 2
             },
             goTab = { tab = it },
+            openStats = { stack = stack + STATS },
         )
     }
 
@@ -138,7 +141,9 @@ fun AppRoot(resumeTick: Int, openOverlaySettings: () -> Unit, tabRequest: Pair<I
             val last = stack.lastOrNull()
             if (last != null) {
                 Box(Modifier.fillMaxSize().background(pal.bg).statusBarsPadding().navigationBarsPadding()) {
-                    if (last == SETTINGS) {
+                    if (last == STATS) {
+                        StatsScreen(data, now) { stack = stack.dropLast(1) }
+                    } else if (last == SETTINGS) {
                         SettingsScreen(data, onBack = { stack = stack.dropLast(1) }, update = update) { update = it }
                     } else {
                         GoalDetailScreen(

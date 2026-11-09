@@ -185,7 +185,11 @@ fun SettingsScreen(data: AppData, onBack: () -> Unit, update: UpdateInfo?, onUpd
                 }
             }
 
+            item { NotifCard(data.notif) }
+
             item { BackupCard() }
+
+            item { ExcelCard(data) }
 
             item { CanvasImportCard(data) }
 

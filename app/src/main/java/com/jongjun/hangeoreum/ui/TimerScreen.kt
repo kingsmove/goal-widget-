@@ -62,7 +62,13 @@ fun TimerScreen(data: AppData, now: Long, nav: Nav, resumeTick: Int, openOverlay
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            T("타이머", 26, Modifier.padding(start = 4.dp, top = 8.dp, bottom = 4.dp), weight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                T("타이머", 26, Modifier.weight(1f), weight = FontWeight.Bold)
+                Box(
+                    Modifier.clip(RoundedCornerShape(12.dp)).background(pal.card)
+                        .bounceClick { nav.openStats() }.padding(horizontal = 12.dp, vertical = 9.dp)
+                ) { T("통계 보기", 14, weight = FontWeight.SemiBold, color = pal.blue) }
+            }
         }
         item {
             CardBox(padding = 24.dp) {

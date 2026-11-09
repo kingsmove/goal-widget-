@@ -246,6 +246,8 @@ fun PlanScreen(data: AppData, nav: Nav) {
             "막대를 누르면 수정할 수 있어요 · 일정 추가 시 ‘장기 플랜에 표시’를 켜면 여기에 나와요", 12,
             Modifier.padding(horizontal = 28.dp, vertical = 12.dp), color = pal.sub,
         )
+        Box(Modifier.padding(horizontal = 20.dp)) { ExcelCard(data) }
+        VGap(12.dp)
         Box(Modifier.padding(horizontal = 20.dp)) { CanvasImportCard(data) }
     }
 }

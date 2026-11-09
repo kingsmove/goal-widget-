@@ -73,6 +73,9 @@ fun GoalEditorSheet(req: GoalEditReq, data: AppData, onDismiss: () -> Unit) {
     var level by remember { mutableStateOf(if (req.level in levels) req.level else levels.first()) }
     var gColor by remember { mutableIntStateOf(existing?.color ?: -1) }
     var gCustom by remember { mutableStateOf(existing?.customColor) }
+    var numeric by remember { mutableStateOf((existing?.target ?: 0) > 0) }
+    var targetText by remember { mutableStateOf(existing?.target?.takeIf { it > 0 }?.toString() ?: "") }
+    var unit by remember { mutableStateOf(existing?.unit ?: "회") }
     var anchor by remember {
         mutableStateOf(existing?.let { Dates.date(it.endDay) } ?: LocalDate.now())
     }
@@ -130,15 +133,36 @@ fun GoalEditorSheet(req: GoalEditReq, data: AppData, onDismiss: () -> Unit) {
                 onIndex = { gColor = it; gCustom = null },
                 onCustom = { gCustom = it })
 
+            Row(Modifier.padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    T("숫자로 진행률 채우기", 15, weight = FontWeight.Medium)
+                    T("예: 기출 10회 중 4회 → 40%", 13, color = pal.sub)
+                }
+                Switch(
+                    checked = numeric, onCheckedChange = { numeric = it },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White, checkedTrackColor = pal.blue,
+                        uncheckedThumbColor = Color.White, uncheckedTrackColor = pal.line, uncheckedBorderColor = Color.Transparent,
+                    ),
+                )
+            }
+            if (numeric) {
+                Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    InputField(targetText, { v -> targetText = v.filter { it.isDigit() }.take(5) }, "목표 수치", Modifier.weight(1f), size = 18)
+                    InputField(unit, { unit = it.take(6) }, "단위", Modifier.weight(1f), size = 18)
+                }
+            }
+
             FieldLabel("메모 (선택)")
             InputField(memo, { memo = it }, "예: 기출 3회차까지", size = 16, singleLine = false)
 
             VGap(28.dp)
-            PrimaryButton(if (existing == null) "추가하기" else "저장하기", Modifier.fillMaxWidth(), enabled = title.isNotBlank()) {
+            PrimaryButton(if (existing == null) "추가하기" else "저장하기", Modifier.fillMaxWidth(), enabled = title.isNotBlank() && (!numeric || (targetText.toIntOrNull() ?: 0) > 0)) {
                 val (s, e) = Dates.range(level, anchor)
                 val goal = if (existing != null) {
                     existing.copy(
                         title = title.trim(), memo = memo.trim(), level = level, endDay = e, color = gColor, customColor = gCustom,
+                        target = if (numeric) targetText.toIntOrNull() ?: 0 else 0, unit = if (numeric) unit.trim() else "",
                         startDay = if (existing.startDay <= e && existing.level == level &&
                             (level == Level.YEAR || level == Level.MONTH)) existing.startDay else s,
                     )
@@ -147,6 +171,8 @@ fun GoalEditorSheet(req: GoalEditReq, data: AppData, onDismiss: () -> Unit) {
                     startDay = s, endDay = e, done = false, memo = memo.trim(), createdAt = System.currentTimeMillis(),
                     color = gColor,
                     customColor = gCustom,
+                    target = if (numeric) targetText.toIntOrNull() ?: 0 else 0,
+                    unit = if (numeric) unit.trim() else "",
                 )
                 Store.upsertGoal(goal)
                 close()

@@ -23,6 +23,37 @@ data class Goal(
     val color: Int = -1,
     /** Exact ARGB color picked freely; overrides [color]. */
     val customColor: Int? = null,
+    /** Numeric goal: progress = current / target (e.g. 기출 4/10회). 0 = not numeric. */
+    val target: Int = 0,
+    val current: Int = 0,
+    val unit: String = "",
+    /** "" = app, "excel" = imported from the Excel template. */
+    val source: String = "",
+) {
+    val numeric: Boolean get() = target > 0
+}
+
+/** Repeating to-do; a DAY goal is created for it on matching days. days: bit 0 = Mon … bit 6 = Sun. */
+data class Routine(
+    val id: String,
+    val title: String,
+    val days: Int,
+    val parentId: String? = null,
+    val memo: String = "",
+    val createdAt: Long = 0L,
+    val source: String = "",
+) {
+    fun on(dayOfWeek: Int): Boolean = days and (1 shl (dayOfWeek - 1)) != 0 // 1 = Mon … 7 = Sun
+}
+
+data class NotifPrefs(
+    val events: Boolean = true,
+    val eventLeadMin: Int = 30,
+    val ddays: Boolean = true,
+    val morning: Boolean = true,
+    val morningMin: Int = 8 * 60,
+    val evening: Boolean = true,
+    val eveningMin: Int = 21 * 60,
 )
 
 /** What an event is, for the resume view. color = canvas-style default color. */
@@ -102,4 +133,8 @@ data class AppData(
     val timer: TimerState = TimerState(),
     val focusGuard: Boolean = true,
     val theme: ThemePrefs = ThemePrefs(),
+    val routines: List<Routine> = emptyList(),
+    /** ids of routine to-dos the user deleted for a day, so they aren't recreated. */
+    val routineSkips: Set<String> = emptySet(),
+    val notif: NotifPrefs = NotifPrefs(),
 )

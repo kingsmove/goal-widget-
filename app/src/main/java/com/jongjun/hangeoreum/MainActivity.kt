@@ -1,6 +1,12 @@
 package com.jongjun.hangeoreum
 
+import android.Manifest
 import android.app.KeyguardManager
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import com.jongjun.hangeoreum.notify.Reminders
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -49,9 +55,22 @@ class MainActivity : ComponentActivity() {
     private var started = false
     private var suppressGuard = false
 
+    private val notifPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         readTab(intent)
+        Reminders.ensureChannel(this)
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            val p = getSharedPreferences("app", MODE_PRIVATE)
+            if (!p.getBoolean("askedNotif", false)) {
+                p.edit().putBoolean("askedNotif", true).apply()
+                suppressGuard = true
+                notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
         enableEdgeToEdge()
         setContent {
             val data by Store.data.collectAsState()
@@ -82,7 +101,9 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         resumeTick.intValue++
+        Store.ensureRoutines()
         WidgetKit.refreshAll(this)
+        Reminders.reschedule(this)
     }
 
     override fun onStop() {

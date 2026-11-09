@@ -101,6 +101,23 @@ fun HomeScreen(data: AppData, now: Long, nav: Nav, update: UpdateInfo?, openSett
         item {
             CardBox {
                 SectionTitle("오늘 할 일", "+ 추가") { nav.editGoal(GoalEditReq(null, Level.DAY, null)) }
+                val overdue = data.goals.filter {
+                    it.level == Level.DAY && !it.done && it.endDay in (today - 14) until today && !it.id.startsWith("rt-")
+                }
+                if (overdue.isNotEmpty()) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(bottom = 8.dp).clip(RoundedCornerShape(14.dp)).background(pal.fill)
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        T("지난 미완료 ${overdue.size}개", 14, Modifier.weight(1f), weight = FontWeight.Medium, color = pal.sub)
+                        T(
+                            "오늘로 가져오기", 14,
+                            Modifier.bounceClick { Store.moveGoals(overdue.map { it.id }, today) },
+                            weight = FontWeight.Bold, color = pal.blue,
+                        )
+                    }
+                }
                 if (todays.isEmpty()) EmptyNote("오늘 할 일을 추가해보세요")
                 todays.forEach { g -> GoalCheckRow(g, data, nav) }
             }

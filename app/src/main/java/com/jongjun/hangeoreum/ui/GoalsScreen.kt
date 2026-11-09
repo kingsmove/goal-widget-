@@ -15,7 +15,13 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import com.jongjun.hangeoreum.data.Routine
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +49,9 @@ fun GoalsScreen(data: AppData, now: Long, nav: Nav) {
     val current = all.filter { it.endDay >= today && !(it.done && it.endDay < today) }
         .sortedWith(compareBy<Goal> { it.done }.thenBy { it.endDay }.thenBy { it.createdAt })
     val past = all.filter { it.endDay < today }.sortedByDescending { it.endDay }
+    var routineSheet by remember { mutableStateOf(false) }
+    var routineEdit by remember { mutableStateOf<Routine?>(null) }
+    var examSheet by remember { mutableStateOf(false) }
 
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -52,6 +61,10 @@ fun GoalsScreen(data: AppData, now: Long, nav: Nav) {
         item {
             Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 T("목표", 26, Modifier.weight(1f), weight = FontWeight.Bold)
+                Box(
+                    Modifier.padding(end = 8.dp).clip(RoundedCornerShape(12.dp)).background(pal.card)
+                        .bounceClick { examSheet = true }.padding(horizontal = 12.dp, vertical = 9.dp)
+                ) { T("시험 플랜", 14, weight = FontWeight.SemiBold, color = pal.blue) }
                 IconCircle(Icons.Filled.Add, { nav.editGoal(GoalEditReq(null, level, null)) }, tint = pal.blue, bg = pal.card)
             }
         }
@@ -60,6 +73,9 @@ fun GoalsScreen(data: AppData, now: Long, nav: Nav) {
         }
         item {
             T(hint(level), 13, Modifier.padding(start = 4.dp, top = 2.dp), color = pal.sub)
+        }
+        if (level == Level.DAY) {
+            item { RoutineCard(data) { r -> routineEdit = r; routineSheet = true } }
         }
         if (current.isEmpty()) {
             item { CardBox { EmptyNote("${level.label} 목표가 없어요\n오른쪽 위 + 로 추가해보세요") } }
@@ -77,6 +93,9 @@ fun GoalsScreen(data: AppData, now: Long, nav: Nav) {
             if (showPast) items(past, key = { "p" + it.id }) { g -> GoalCard(g, data, now, nav) }
         }
     }
+
+    if (routineSheet) RoutineEditorSheet(routineEdit, data) { routineSheet = false; routineEdit = null }
+    if (examSheet) ExamPlanSheet(nav) { examSheet = false }
 }
 
 private fun hint(level: Level) = when (level) {
@@ -111,7 +130,7 @@ fun GoalCard(g: Goal, data: AppData, now: Long, nav: Nav) {
             if (g.done) Pill("완료", color = pal.green, bg = pal.fill)
             else Pill(Dates.dday(g.endDay), color = gc, bg = gc.copy(alpha = 0.12f))
         }
-        if (g.level != Level.DAY || kids.isNotEmpty()) {
+        if (g.level != Level.DAY || kids.isNotEmpty() || g.numeric) {
             Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 ProgressLine(p, Modifier.weight(1f), color = gc)
                 Gap(12.dp)
@@ -119,9 +138,21 @@ fun GoalCard(g: Goal, data: AppData, now: Long, nav: Nav) {
             }
         }
         val foot = buildList {
+            if (g.numeric) add("${g.current}/${g.target}${g.unit}")
             if (kids.isNotEmpty()) add("세부 목표 ${kids.count { it.done || data.progress(it) >= 1f }}/${kids.size}")
             if (study > 0) add("공부 ${Dates.duration(study)}")
         }
-        if (foot.isNotEmpty()) T(foot.joinToString(" · "), 13, Modifier.padding(top = 10.dp), color = pal.sub)
+        if (foot.isNotEmpty() || (g.numeric && !g.done)) {
+            Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                T(foot.joinToString(" · "), 13, Modifier.weight(1f), color = pal.sub)
+                if (g.numeric && !g.done) {
+                    Box(
+                        Modifier.clip(RoundedCornerShape(10.dp)).background(gc.copy(alpha = 0.12f))
+                            .bounceClick { Store.setGoalCurrent(g.id, g.current + 1) }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) { T("+1${g.unit}", 13, weight = FontWeight.Bold, color = gc) }
+                }
+            }
+        }
     }
 }

@@ -18,6 +18,7 @@ fun AppData.descendantIds(id: String): Set<String> {
 /** 0..1. Done = 1. Otherwise the average of children (leaf = 0). */
 fun AppData.progress(g: Goal, depth: Int = 0): Float {
     if (g.done) return 1f
+    if (g.numeric) return (g.current.toFloat() / g.target).coerceIn(0f, 1f)
     if (depth > 8) return 0f
     val kids = goals.filter { it.parentId == g.id }
     if (kids.isEmpty()) return 0f

@@ -28,6 +28,7 @@ object Store {
         _data.value = next
         runCatching { save(next) }
         runCatching { com.jongjun.hangeoreum.widget.WidgetKit.refreshAll(app) }
+        runCatching { com.jongjun.hangeoreum.notify.Reminders.reschedule(app) }
     }
 
     // ---------- Goals ----------
@@ -44,9 +45,69 @@ object Store {
         val remove = d.descendantIds(id) + id
         d.copy(
             goals = d.goals.filterNot { it.id in remove },
+            routineSkips = d.routineSkips + remove.filter { it.startsWith("rt-") },
             timer = if (d.timer.goalId in remove) d.timer.copy(goalId = null) else d.timer,
         )
     }
+
+    fun setGoalCurrent(id: String, value: Int) = update { d ->
+        d.copy(goals = d.goals.map {
+            if (it.id == id) it.copy(current = value.coerceAtLeast(0), done = if (it.target > 0) value >= it.target else it.done) else it
+        })
+    }
+
+    /** Moves DAY goals to another day (carry over / postpone). */
+    fun moveGoals(ids: Collection<String>, day: Long) = update { d ->
+        d.copy(goals = d.goals.map { if (it.id in ids) it.copy(startDay = day, endDay = day) else it })
+    }
+
+    fun addAll(goals: List<Goal> = emptyList(), events: List<Event> = emptyList()) = update { d ->
+        d.copy(goals = d.goals + goals, events = d.events + events)
+    }
+
+    /** Replaces everything that came from Excel (and the older Obsidian import) with [p]. */
+    fun applyExcel(p: ExcelPlan) = update { d ->
+        d.copy(
+            events = d.events.filterNot { it.source == ExcelPlanner.SOURCE || it.source == CanvasPlan.SOURCE } + p.events,
+            goals = d.goals.filterNot { it.source == ExcelPlanner.SOURCE } + p.goals,
+            routines = d.routines.filterNot { it.source == ExcelPlanner.SOURCE } + p.routines,
+        )
+    }
+
+    // ---------- Routines ----------
+    fun upsertRoutine(r: Routine) = update { d ->
+        val exists = d.routines.any { it.id == r.id }
+        d.copy(routines = if (exists) d.routines.map { if (it.id == r.id) r else it } else d.routines + r)
+    }
+
+    fun deleteRoutine(id: String) = update { d ->
+        val today = Dates.today()
+        // drop today's unfinished copy too; keep history
+        d.copy(
+            routines = d.routines.filterNot { it.id == id },
+            goals = d.goals.filterNot { it.id == "rt-$id-$today" && !it.done },
+        )
+    }
+
+    /** Creates today's to-dos for routines (idempotent). */
+    fun ensureRoutines(today: Long = Dates.today()) {
+        val d = _data.value
+        val dow = Dates.date(today).dayOfWeek.value
+        val missing = d.routines.filter { it.on(dow) }.map { r -> r to "rt-${r.id}-$today" }
+            .filter { (_, gid) -> gid !in d.routineSkips && d.goals.none { it.id == gid } }
+        if (missing.isEmpty()) return
+        update { cur ->
+            cur.copy(goals = cur.goals + missing.map { (r, gid) ->
+                Goal(
+                    id = gid, title = r.title, level = Level.DAY, parentId = r.parentId,
+                    startDay = today, endDay = today, done = false, memo = r.memo,
+                    createdAt = System.currentTimeMillis(),
+                )
+            })
+        }
+    }
+
+    fun setNotif(block: (NotifPrefs) -> NotifPrefs) = update { d -> d.copy(notif = block(d.notif)) }
 
     // ---------- Events ----------
     fun upsertEvent(e: Event) = update { d ->
@@ -139,6 +200,7 @@ object Store {
                     put("start", g.startDay); put("end", g.endDay); put("done", g.done)
                     put("memo", g.memo); put("createdAt", g.createdAt); put("color", g.color)
                     put("cc", g.customColor ?: JSONObject.NULL)
+                    put("target", g.target); put("current", g.current); put("unit", g.unit); put("src", g.source)
                 })
             }
         })
@@ -173,6 +235,22 @@ object Store {
             put("items", JSONArray().apply { th.itemColors.forEach { put(it ?: JSONObject.NULL) } })
             put("years", JSONArray().apply { th.yearColors.forEach { put(it ?: JSONObject.NULL) } })
             put("levels", JSONArray().apply { th.levelColors.forEach { put(it ?: JSONObject.NULL) } })
+        })
+        root.put("routines", JSONArray().apply {
+            d.routines.forEach { r ->
+                put(JSONObject().apply {
+                    put("id", r.id); put("title", r.title); put("days", r.days)
+                    put("parentId", r.parentId ?: JSONObject.NULL); put("memo", r.memo)
+                    put("createdAt", r.createdAt); put("src", r.source)
+                })
+            }
+        })
+        root.put("routineSkips", JSONArray().apply { d.routineSkips.forEach { put(it) } })
+        val n = d.notif
+        root.put("notif", JSONObject().apply {
+            put("events", n.events); put("lead", n.eventLeadMin); put("ddays", n.ddays)
+            put("morning", n.morning); put("morningMin", n.morningMin)
+            put("evening", n.evening); put("eveningMin", n.eveningMin)
         })
         return root.toString()
     }
@@ -214,6 +292,10 @@ object Store {
                     createdAt = o.optLong("createdAt"),
                     color = o.optInt("color", -1),
                     customColor = o.optC("cc"),
+                    target = o.optInt("target", 0),
+                    current = o.optInt("current", 0),
+                    unit = o.optString("unit", ""),
+                    source = o.optString("src", ""),
                 )
             }
         } ?: emptyList()
@@ -260,6 +342,27 @@ object Store {
             yearColors = tj.optJSONArray("years").colors(5),
             levelColors = tj.optJSONArray("levels").colors(4),
         )
-        return AppData(goals, sessions, events, timer, root.optBoolean("focusGuard", true), theme)
+        val routines = root.optJSONArray("routines")?.let { arr ->
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                Routine(
+                    id = o.getString("id"), title = o.getString("title"), days = o.optInt("days", 0x7F),
+                    parentId = o.optStr("parentId"), memo = o.optString("memo", ""),
+                    createdAt = o.optLong("createdAt"), source = o.optString("src", ""),
+                )
+            }
+        } ?: emptyList()
+        val skips = root.optJSONArray("routineSkips")?.let { arr -> (0 until arr.length()).map { arr.getString(it) }.toSet() } ?: emptySet()
+        val nj = root.optJSONObject("notif")
+        val notif = if (nj == null) NotifPrefs() else NotifPrefs(
+            events = nj.optBoolean("events", true), eventLeadMin = nj.optInt("lead", 30),
+            ddays = nj.optBoolean("ddays", true),
+            morning = nj.optBoolean("morning", true), morningMin = nj.optInt("morningMin", 480),
+            evening = nj.optBoolean("evening", true), eveningMin = nj.optInt("eveningMin", 1260),
+        )
+        return AppData(
+            goals, sessions, events, timer, root.optBoolean("focusGuard", true), theme,
+            routines = routines, routineSkips = skips, notif = notif,
+        )
     }
 }

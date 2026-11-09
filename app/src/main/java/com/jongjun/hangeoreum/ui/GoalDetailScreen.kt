@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -99,6 +100,14 @@ fun GoalDetailScreen(
                         if (study > 0) T("공부 ${Dates.duration(study)}", 14, Modifier.padding(bottom = 8.dp), weight = FontWeight.SemiBold, color = pal.sub)
                     }
                     ProgressLine(p, Modifier.padding(top = 10.dp), color = gc, height = 10.dp)
+                    if (g.numeric) {
+                        Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            T("${g.current} / ${g.target}${g.unit}", 20, Modifier.weight(1f), weight = FontWeight.Bold, tabular = true)
+                            SecondaryButton("−", Modifier.width(56.dp)) { Store.setGoalCurrent(g.id, g.current - 1) }
+                            Gap(8.dp)
+                            PrimaryButton("+1", Modifier.width(72.dp), color = gc) { Store.setGoalCurrent(g.id, g.current + 1) }
+                        }
+                    }
                     if (kids.isNotEmpty()) {
                         T(
                             "세부 목표 ${kids.size}개 중 ${kids.count { it.done || data.progress(it) >= 1f }}개 완료", 13,
@@ -112,6 +121,13 @@ fun GoalDetailScreen(
                             textColor = if (g.done) pal.sub else pal.text,
                         ) { Store.toggleGoal(g.id) }
                         PrimaryButton("타이머 시작", Modifier.weight(1f), color = gc) { nav.startTimerFor(g.id) }
+                    }
+                    if (g.level == com.jongjun.hangeoreum.data.Level.DAY && !g.done) {
+                        T(
+                            "내일로 미루기 →", 14,
+                            Modifier.padding(top = 14.dp).bounceClick { Store.moveGoals(listOf(g.id), g.endDay + 1) },
+                            weight = FontWeight.SemiBold, color = pal.sub,
+                        )
                     }
                 }
             }
