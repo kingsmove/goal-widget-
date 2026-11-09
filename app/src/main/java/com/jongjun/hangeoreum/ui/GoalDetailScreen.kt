@@ -55,6 +55,7 @@ fun GoalDetailScreen(
     val parent = data.goal(g.parentId)
     val study = data.studyMsForGoal(g.id, now)
     val ids = data.descendantIds(g.id) + g.id
+    val gc = goalColor(g)
     val sessions = data.sessions.filter { it.goalId in ids }.sortedByDescending { it.startMs }.take(5)
 
     Column(Modifier.fillMaxSize()) {
@@ -73,7 +74,7 @@ fun GoalDetailScreen(
             item {
                 Column(Modifier.padding(start = 4.dp, bottom = 8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Pill("${g.level.label} 목표")
+                        Pill("${g.level.label} 목표", color = gc, bg = gc.copy(alpha = 0.12f))
                         Gap(8.dp)
                         T("${Dates.period(g.level, g.startDay, g.endDay)} · ${Dates.dday(g.endDay)}", 14, color = pal.sub)
                     }
@@ -92,12 +93,12 @@ fun GoalDetailScreen(
             item {
                 CardBox {
                     Row(verticalAlignment = Alignment.Bottom) {
-                        T("${pct(p)}", 44, weight = FontWeight.Bold, color = pal.blue, tabular = true)
-                        T("%", 22, Modifier.padding(bottom = 6.dp, start = 2.dp), weight = FontWeight.Bold, color = pal.blue)
+                        T("${pct(p)}", 44, weight = FontWeight.Bold, color = gc, tabular = true)
+                        T("%", 22, Modifier.padding(bottom = 6.dp, start = 2.dp), weight = FontWeight.Bold, color = gc)
                         T("", 1, Modifier.weight(1f))
                         if (study > 0) T("공부 ${Dates.duration(study)}", 14, Modifier.padding(bottom = 8.dp), weight = FontWeight.SemiBold, color = pal.sub)
                     }
-                    ProgressLine(p, Modifier.padding(top = 10.dp), height = 10.dp)
+                    ProgressLine(p, Modifier.padding(top = 10.dp), color = gc, height = 10.dp)
                     if (kids.isNotEmpty()) {
                         T(
                             "세부 목표 ${kids.size}개 중 ${kids.count { it.done || data.progress(it) >= 1f }}개 완료", 13,
@@ -110,7 +111,7 @@ fun GoalDetailScreen(
                             Modifier.weight(1f),
                             textColor = if (g.done) pal.sub else pal.text,
                         ) { Store.toggleGoal(g.id) }
-                        PrimaryButton("타이머 시작", Modifier.weight(1f)) { nav.startTimerFor(g.id) }
+                        PrimaryButton("타이머 시작", Modifier.weight(1f), color = gc) { nav.startTimerFor(g.id) }
                     }
                 }
             }

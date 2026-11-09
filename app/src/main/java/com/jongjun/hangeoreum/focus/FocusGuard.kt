@@ -3,6 +3,7 @@ package com.jongjun.hangeoreum.focus
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.Looper
@@ -36,6 +37,10 @@ object FocusGuard {
         val wm = app.getSystemService(WindowManager::class.java) ?: return
         val v = LayoutInflater.from(app).inflate(R.layout.focus_overlay, null)
         val timeView = v.findViewById<TextView>(R.id.ov_time)
+        Store.current.theme.accent?.let { accent ->
+            v.findViewById<View>(R.id.ov_back).backgroundTintList = ColorStateList.valueOf(accent)
+            timeView.setTextColor(accent)
+        }
 
         val tick = object : Runnable {
             override fun run() {

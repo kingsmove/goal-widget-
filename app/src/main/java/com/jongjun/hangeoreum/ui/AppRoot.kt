@@ -41,6 +41,9 @@ import com.jongjun.hangeoreum.data.Event
 import com.jongjun.hangeoreum.data.Goal
 import com.jongjun.hangeoreum.data.Level
 import com.jongjun.hangeoreum.data.Store
+import androidx.compose.ui.platform.LocalContext
+import com.jongjun.hangeoreum.update.UpdateInfo
+import com.jongjun.hangeoreum.update.Updater
 import kotlinx.coroutines.delay
 
 /** Request to open the goal editor. */
@@ -48,6 +51,8 @@ data class GoalEditReq(val existing: Goal?, val level: Level, val parentId: Stri
 
 /** Request to open the event editor. */
 data class EventEditReq(val existing: Event?, val day: Long = Dates.today(), val onPlan: Boolean = false)
+
+const val SETTINGS = "__settings"
 
 class Nav(
     val openGoal: (String) -> Unit,
@@ -91,6 +96,11 @@ fun AppRoot(resumeTick: Int, openOverlaySettings: () -> Unit) {
 
     BackHandler(enabled = stack.isNotEmpty()) { stack = stack.dropLast(1) }
 
+    // check GitHub for a newer build once per launch
+    val ctx = LocalContext.current
+    var update by remember { mutableStateOf<UpdateInfo?>(null) }
+    LaunchedEffect(Unit) { Updater.check(ctx).onSuccess { update = it } }
+
     Box(Modifier.fillMaxSize().background(pal.bg)) {
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f).statusBarsPadding()) {
@@ -100,7 +110,7 @@ fun AppRoot(resumeTick: Int, openOverlaySettings: () -> Unit) {
                     label = "tab",
                 ) { t ->
                     when (t) {
-                        0 -> HomeScreen(data, now, nav)
+                        0 -> HomeScreen(data, now, nav, update) { stack = stack + SETTINGS }
                         1 -> GoalsScreen(data, now, nav)
                         2 -> TimerScreen(data, now, nav, resumeTick, openOverlaySettings)
                         3 -> CalendarScreen(data, now, nav)
@@ -119,14 +129,18 @@ fun AppRoot(resumeTick: Int, openOverlaySettings: () -> Unit) {
             val last = stack.lastOrNull()
             if (last != null) {
                 Box(Modifier.fillMaxSize().background(pal.bg).statusBarsPadding().navigationBarsPadding()) {
-                    GoalDetailScreen(
-                        goalId = last,
-                        data = data,
-                        now = now,
-                        nav = nav,
-                        onBack = { stack = stack.dropLast(1) },
-                        onDeleted = { stack = stack.dropLast(1) },
-                    )
+                    if (last == SETTINGS) {
+                        SettingsScreen(data, onBack = { stack = stack.dropLast(1) }, update = update) { update = it }
+                    } else {
+                        GoalDetailScreen(
+                            goalId = last,
+                            data = data,
+                            now = now,
+                            nav = nav,
+                            onBack = { stack = stack.dropLast(1) },
+                            onDeleted = { stack = stack.dropLast(1) },
+                        )
+                    }
                 }
             }
         }

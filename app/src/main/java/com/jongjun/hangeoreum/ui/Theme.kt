@@ -9,11 +9,27 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import com.jongjun.hangeoreum.R
+import com.jongjun.hangeoreum.data.Goal
+import com.jongjun.hangeoreum.data.ThemePrefs
+
+val DefaultItemColors = listOf(
+    Color(0xFF3182F6), // 파랑
+    Color(0xFF00A6A6), // 청록
+    Color(0xFF8B5CF6), // 보라
+    Color(0xFFFF8A3D), // 주황
+    Color(0xFF03B26C), // 초록
+    Color(0xFFF25C8A), // 분홍
+)
+
+val DefaultYearColors = listOf(
+    Color(0xFF3182F6), Color(0xFF00A6A6), Color(0xFF03B26C), Color(0xFF8B5CF6), Color(0xFFFF8A3D),
+)
 
 data class Palette(
     val dark: Boolean,
@@ -28,6 +44,9 @@ data class Palette(
     val blueSoft: Color,
     val red: Color,
     val green: Color,
+    val itemColors: List<Color> = DefaultItemColors,
+    val yearColors: List<Color> = DefaultYearColors,
+    val levelColors: List<Color> = List(4) { blue },
 )
 
 val LightPalette = Palette(
@@ -60,18 +79,49 @@ val DarkPalette = Palette(
     green = Color(0xFF26C281),
 )
 
-val EventColors = listOf(
-    Color(0xFF3182F6), // 파랑
-    Color(0xFF00A6A6), // 청록
-    Color(0xFF8B5CF6), // 보라
-    Color(0xFFFF8A3D), // 주황
-    Color(0xFF03B26C), // 초록
-    Color(0xFFF25C8A), // 분홍
-)
+fun isDarkFor(prefs: ThemePrefs, system: Boolean): Boolean = when (prefs.mode) {
+    1 -> false
+    2 -> true
+    else -> system
+}
 
-fun eventColor(i: Int): Color = EventColors[((i % EventColors.size) + EventColors.size) % EventColors.size]
+fun buildPalette(dark: Boolean, t: ThemePrefs): Palette {
+    val base = if (dark) DarkPalette else LightPalette
+    val accent = t.accent?.let { Color(it) } ?: base.blue
+    val bgO = (if (dark) t.bgDark else t.bgLight)?.let { Color(it) }
+    val cardO = (if (dark) t.cardDark else t.cardLight)?.let { Color(it) }
+    val textO = (if (dark) t.textDark else t.textLight)?.let { Color(it) }
+    val bg = bgO ?: base.bg
+    val card = cardO ?: base.card
+    val text = textO ?: base.text
+    val derive = textO != null || cardO != null || bgO != null
+    return base.copy(
+        bg = bg,
+        card = card,
+        text = text,
+        sub = if (derive) text.copy(alpha = 0.62f).compositeOver(card) else base.sub,
+        tertiary = if (derive) text.copy(alpha = 0.36f).compositeOver(card) else base.tertiary,
+        line = if (derive) text.copy(alpha = 0.12f).compositeOver(card) else base.line,
+        fill = if (derive) text.copy(alpha = 0.06f).compositeOver(card) else base.fill,
+        blue = accent,
+        blueSoft = if (t.accent != null || derive) accent.copy(alpha = if (dark) 0.20f else 0.11f).compositeOver(card) else base.blueSoft,
+        itemColors = DefaultItemColors.mapIndexed { i, c -> t.itemColors.getOrNull(i)?.let { Color(it) } ?: c },
+        yearColors = DefaultYearColors.mapIndexed { i, c -> t.yearColors.getOrNull(i)?.let { Color(it) } ?: c },
+        levelColors = List(4) { i -> t.levelColors.getOrNull(i)?.let { Color(it) } ?: accent },
+    )
+}
 
 val LocalPalette = staticCompositionLocalOf { LightPalette }
+
+@Composable
+fun itemColor(i: Int): Color {
+    val list = LocalPalette.current.itemColors
+    return list[Math.floorMod(i, list.size)]
+}
+
+@Composable
+fun goalColor(g: Goal): Color =
+    if (g.color >= 0) itemColor(g.color) else LocalPalette.current.levelColors[g.level.ordinal]
 
 val Pretendard = FontFamily(
     Font(R.font.pretendard_regular, FontWeight.Normal),
@@ -83,9 +133,9 @@ val Pretendard = FontFamily(
 private fun TextStyle.pre() = copy(fontFamily = Pretendard)
 
 @Composable
-fun AppTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
-    val p = if (dark) DarkPalette else LightPalette
+fun AppTheme(prefs: ThemePrefs, content: @Composable () -> Unit) {
+    val dark = isDarkFor(prefs, isSystemInDarkTheme())
+    val p = buildPalette(dark, prefs)
     val scheme = if (dark) {
         darkColorScheme(
             primary = p.blue, onPrimary = Color.White, background = p.bg, onBackground = p.text,

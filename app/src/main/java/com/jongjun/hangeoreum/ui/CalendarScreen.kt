@@ -167,7 +167,7 @@ private fun MonthGrid(data: AppData, first: LocalDate, today: Long, selected: Lo
                                 val goalCount = data.dayGoalsOn(day).size
                                 Row(Modifier.padding(top = 3.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                                     singles.take(3).forEach { e ->
-                                        Box(Modifier.size(5.dp).clip(CircleShape).background(eventColor(e.color)))
+                                        Box(Modifier.size(5.dp).clip(CircleShape).background(itemColor(e.color)))
                                     }
                                     if (goalCount > 0 && singles.size < 3) {
                                         Box(Modifier.size(5.dp).clip(CircleShape).background(pal.tertiary))
@@ -178,7 +178,7 @@ private fun MonthGrid(data: AppData, first: LocalDate, today: Long, selected: Lo
                     }
                     // bars
                     segs.forEach { seg ->
-                        val c = eventColor(seg.event.color)
+                        val c = itemColor(seg.event.color)
                         val x = cellW * (seg.start - ws).toInt() + 2.dp
                         val wdt = cellW * (seg.end - seg.start + 1).toInt() - 4.dp
                         Box(
@@ -217,7 +217,7 @@ private fun DayDetail(data: AppData, day: Long, now: Long, nav: Nav) {
         if (events.isEmpty() && goals.isEmpty()) EmptyNote("일정이 없어요")
 
         events.forEach { e ->
-            val c = eventColor(e.color)
+            val c = itemColor(e.color)
             Row(
                 Modifier.fillMaxWidth().bounceClick { nav.editEvent(EventEditReq(e)) }.padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,

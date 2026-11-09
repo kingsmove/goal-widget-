@@ -6,7 +6,13 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.content.res.Configuration
+import android.os.Build
 import android.os.SystemClock
+import androidx.compose.ui.graphics.toArgb
+import com.jongjun.hangeoreum.ui.buildPalette
+import com.jongjun.hangeoreum.ui.isDarkFor
 import android.view.View
 import android.widget.RemoteViews
 import com.jongjun.hangeoreum.MainActivity
@@ -33,6 +39,24 @@ class GoalWidget : AppWidgetProvider() {
             if (ids.isEmpty()) return
             val views = build(context)
             ids.forEach { mgr.updateAppWidget(it, views) }
+        }
+
+        private fun applyColors(context: Context, v: RemoteViews) {
+            val th = Store.current.theme
+            val sysDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
+            val p = buildPalette(isDarkFor(th, sysDark), th)
+            val accent = p.blue.toArgb()
+            v.setTextColor(R.id.w_percent, accent)
+            v.setTextColor(R.id.w_timer, accent)
+            v.setTextColor(R.id.w_date, p.sub.toArgb())
+            v.setTextColor(R.id.w_footer, p.sub.toArgb())
+            intArrayOf(R.id.w_goal1, R.id.w_goal2, R.id.w_goal3).forEach { v.setTextColor(it, p.text.toArgb()) }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                v.setColorStateList(R.id.w_root, "setBackgroundTintList", ColorStateList.valueOf(p.card.toArgb()))
+                v.setColorStateList(R.id.w_progress, "setProgressTintList", ColorStateList.valueOf(accent))
+                v.setColorStateList(R.id.w_progress, "setProgressBackgroundTintList", ColorStateList.valueOf(p.line.toArgb()))
+            }
         }
 
         private fun build(context: Context): RemoteViews {
@@ -86,6 +110,8 @@ class GoalWidget : AppWidgetProvider() {
                 v.setViewVisibility(R.id.w_timer, View.GONE)
                 v.setChronometer(R.id.w_timer, SystemClock.elapsedRealtime(), null, false)
             }
+
+            applyColors(context, v)
 
             val intent = Intent(context, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)

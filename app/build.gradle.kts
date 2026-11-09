@@ -12,8 +12,10 @@ android {
         applicationId = "com.jongjun.hangeoreum"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1"
+        // CI run number = build number; the in-app updater compares against it.
+        val runNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+        versionCode = runNumber
+        versionName = "1.$runNumber"
     }
 
     signingConfigs {

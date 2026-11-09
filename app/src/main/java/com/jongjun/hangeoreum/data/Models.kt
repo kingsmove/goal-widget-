@@ -19,6 +19,8 @@ data class Goal(
     val done: Boolean,
     val memo: String,
     val createdAt: Long,
+    /** -1 = use the level color, otherwise index into the item palette. */
+    val color: Int = -1,
 )
 
 data class Session(
@@ -57,10 +59,26 @@ data class TimerState(
     fun elapsed(now: Long): Long = accumulatedMs + if (running) (now - startedAtMs).coerceAtLeast(0L) else 0L
 }
 
+/** Colors are ARGB ints; null = app default. */
+data class ThemePrefs(
+    val mode: Int = 0, // 0 system, 1 light, 2 dark
+    val accent: Int? = null,
+    val bgLight: Int? = null,
+    val cardLight: Int? = null,
+    val textLight: Int? = null,
+    val bgDark: Int? = null,
+    val cardDark: Int? = null,
+    val textDark: Int? = null,
+    val itemColors: List<Int?> = List(6) { null },
+    val yearColors: List<Int?> = List(5) { null },
+    val levelColors: List<Int?> = List(4) { null },
+)
+
 data class AppData(
     val goals: List<Goal> = emptyList(),
     val sessions: List<Session> = emptyList(),
     val events: List<Event> = emptyList(),
     val timer: TimerState = TimerState(),
     val focusGuard: Boolean = true,
+    val theme: ThemePrefs = ThemePrefs(),
 )

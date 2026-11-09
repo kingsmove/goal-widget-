@@ -13,7 +13,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
+import com.jongjun.hangeoreum.update.UpdateInfo
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,7 +39,7 @@ import com.jongjun.hangeoreum.data.todayProgress
 import com.jongjun.hangeoreum.data.upcomingEvents
 
 @Composable
-fun HomeScreen(data: AppData, now: Long, nav: Nav) {
+fun HomeScreen(data: AppData, now: Long, nav: Nav, update: UpdateInfo?, openSettings: () -> Unit) {
     val today = Dates.today()
     val todays = data.todayGoals(today)
     val prog = data.todayProgress(today)
@@ -49,9 +52,25 @@ fun HomeScreen(data: AppData, now: Long, nav: Nav) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Column(Modifier.padding(start = 4.dp, top = 8.dp, bottom = 8.dp)) {
-                T(Dates.full(today), 15, weight = FontWeight.Medium, color = pal.sub)
-                T(greeting(prog, todays.isEmpty()), 26, Modifier.padding(top = 4.dp), weight = FontWeight.Bold)
+            Row(Modifier.padding(start = 4.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f)) {
+                    T(Dates.full(today), 15, weight = FontWeight.Medium, color = pal.sub)
+                    T(greeting(prog, todays.isEmpty()), 26, Modifier.padding(top = 4.dp), weight = FontWeight.Bold)
+                }
+                IconCircle(Icons.Filled.Settings, openSettings, tint = pal.sub, bg = pal.card)
+            }
+        }
+
+        if (update != null) {
+            item {
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(pal.blueSoft)
+                        .bounceClick(onClick = openSettings).padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    T("새 버전이 나왔어요", 15, Modifier.weight(1f), weight = FontWeight.SemiBold, color = pal.blue)
+                    T("설치하기 →", 14, weight = FontWeight.Bold, color = pal.blue)
+                }
             }
         }
 
@@ -137,6 +156,7 @@ fun GoalCheckRow(g: Goal, data: AppData, nav: Nav, showParent: Boolean = true) {
 @Composable
 fun GoalProgressRow(g: Goal, data: AppData, nav: Nav) {
     val p = data.progress(g)
+    val gc = goalColor(g)
     Column(Modifier.fillMaxWidth().bounceClick { nav.openGoal(g.id) }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Pill(g.level.label, color = pal.sub, bg = pal.fill)
@@ -146,9 +166,9 @@ fun GoalProgressRow(g: Goal, data: AppData, nav: Nav) {
             T(Dates.dday(g.endDay), 13, weight = FontWeight.SemiBold, color = pal.sub)
         }
         Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            ProgressLine(p, Modifier.weight(1f))
+            ProgressLine(p, Modifier.weight(1f), color = gc)
             Gap(12.dp)
-            T("${pct(p)}%", 14, Modifier.width(40.dp), weight = FontWeight.Bold, color = pal.blue, align = TextAlign.End, tabular = true)
+            T("${pct(p)}%", 14, Modifier.width(40.dp), weight = FontWeight.Bold, color = gc, align = TextAlign.End, tabular = true)
         }
     }
 }
@@ -160,7 +180,7 @@ fun EventRow(e: Event, onClick: () -> Unit) {
         Modifier.fillMaxWidth().bounceClick(onClick = onClick).padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val ec = eventColor(e.color)
+        val ec = itemColor(e.color)
         Column(
             Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(ec.copy(alpha = 0.12f)),
             horizontalAlignment = Alignment.CenterHorizontally,

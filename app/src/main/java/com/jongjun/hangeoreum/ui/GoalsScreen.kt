@@ -92,6 +92,7 @@ fun GoalCard(g: Goal, data: AppData, now: Long, nav: Nav) {
     val kids = data.children(g.id)
     val study = data.studyMsForGoal(g.id, now)
     val parent = data.goal(g.parentId)
+    val gc = goalColor(g)
     CardBox(Modifier.bounceClick { nav.openGoal(g.id) }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (g.level == Level.DAY) {
@@ -108,13 +109,13 @@ fun GoalCard(g: Goal, data: AppData, now: Long, nav: Nav) {
             }
             Gap(8.dp)
             if (g.done) Pill("완료", color = pal.green, bg = pal.fill)
-            else Pill(Dates.dday(g.endDay))
+            else Pill(Dates.dday(g.endDay), color = gc, bg = gc.copy(alpha = 0.12f))
         }
         if (g.level != Level.DAY || kids.isNotEmpty()) {
             Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                ProgressLine(p, Modifier.weight(1f))
+                ProgressLine(p, Modifier.weight(1f), color = gc)
                 Gap(12.dp)
-                T("${pct(p)}%", 15, Modifier.width(44.dp), weight = FontWeight.Bold, color = pal.blue, align = TextAlign.End, tabular = true)
+                T("${pct(p)}%", 15, Modifier.width(44.dp), weight = FontWeight.Bold, color = gc, align = TextAlign.End, tabular = true)
             }
         }
         val foot = buildList {

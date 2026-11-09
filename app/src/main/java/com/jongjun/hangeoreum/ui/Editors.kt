@@ -68,6 +68,7 @@ fun GoalEditorSheet(req: GoalEditReq, data: AppData, onDismiss: () -> Unit) {
     var title by remember { mutableStateOf(existing?.title ?: "") }
     var memo by remember { mutableStateOf(existing?.memo ?: "") }
     var level by remember { mutableStateOf(if (req.level in levels) req.level else levels.first()) }
+    var gColor by remember { mutableIntStateOf(existing?.color ?: -1) }
     var anchor by remember {
         mutableStateOf(existing?.let { Dates.date(it.endDay) } ?: LocalDate.now())
     }
@@ -120,6 +121,19 @@ fun GoalEditorSheet(req: GoalEditReq, data: AppData, onDismiss: () -> Unit) {
                 }
             }
 
+            FieldLabel("색상")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                ChoiceChip("기본", gColor < 0) { gColor = -1 }
+                pal.itemColors.forEachIndexed { i, c ->
+                    androidx.compose.foundation.layout.Box(
+                        Modifier.size(28.dp).clip(CircleShape).background(c).bounceClick { gColor = i },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (i == gColor) Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+
             FieldLabel("메모 (선택)")
             InputField(memo, { memo = it }, "예: 기출 3회차까지", size = 16, singleLine = false)
 
@@ -128,13 +142,14 @@ fun GoalEditorSheet(req: GoalEditReq, data: AppData, onDismiss: () -> Unit) {
                 val (s, e) = Dates.range(level, anchor)
                 val goal = if (existing != null) {
                     existing.copy(
-                        title = title.trim(), memo = memo.trim(), level = level, endDay = e,
+                        title = title.trim(), memo = memo.trim(), level = level, endDay = e, color = gColor,
                         startDay = if (existing.startDay <= e && existing.level == level &&
                             (level == Level.YEAR || level == Level.MONTH)) existing.startDay else s,
                     )
                 } else Goal(
                     id = Store.newId(), title = title.trim(), level = level, parentId = req.parentId,
                     startDay = s, endDay = e, done = false, memo = memo.trim(), createdAt = System.currentTimeMillis(),
+                    color = gColor,
                 )
                 Store.upsertGoal(goal)
                 close()
@@ -237,7 +252,7 @@ fun EventEditorSheet(req: EventEditReq, onDismiss: () -> Unit) {
 
             FieldLabel("색상")
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                EventColors.forEachIndexed { i, c ->
+                pal.itemColors.forEachIndexed { i, c ->
                     androidx.compose.foundation.layout.Box(
                         Modifier.size(34.dp).clip(CircleShape).background(c).bounceClick { color = i },
                         contentAlignment = Alignment.Center,

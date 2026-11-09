@@ -11,7 +11,14 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import android.graphics.Color as AndroidColor
+import androidx.activity.SystemBarStyle
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import com.jongjun.hangeoreum.ui.isDarkFor
 import com.jongjun.hangeoreum.data.Store
 import com.jongjun.hangeoreum.focus.FocusGuard
 import com.jongjun.hangeoreum.ui.AppRoot
@@ -29,7 +36,18 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            AppTheme {
+            val data by Store.data.collectAsState()
+            val dark = isDarkFor(data.theme, isSystemInDarkTheme())
+            DisposableEffect(dark) {
+                enableEdgeToEdge(
+                    statusBarStyle = if (dark) SystemBarStyle.dark(AndroidColor.TRANSPARENT)
+                    else SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
+                    navigationBarStyle = if (dark) SystemBarStyle.dark(AndroidColor.TRANSPARENT)
+                    else SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
+                )
+                onDispose { }
+            }
+            AppTheme(data.theme) {
                 AppRoot(resumeTick.intValue, ::openOverlaySettings)
             }
         }
@@ -69,11 +87,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openOverlaySettings() {
+        launchExternal(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+    }
+
+    /** Opens another screen (settings, installer) without triggering the focus warning. */
+    fun launchExternal(intent: Intent) {
         suppressGuard = true
-        runCatching {
-            startActivity(
-                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
-            )
-        }
+        runCatching { startActivity(intent) }.onFailure { suppressGuard = false }
     }
 }

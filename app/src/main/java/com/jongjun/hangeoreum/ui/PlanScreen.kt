@@ -42,9 +42,6 @@ import com.jongjun.hangeoreum.data.pct
 import com.jongjun.hangeoreum.data.progress
 import java.time.LocalDate
 
-private val YearColors = listOf(
-    Color(0xFF3182F6), Color(0xFF00A6A6), Color(0xFF03B26C), Color(0xFF8B5CF6), Color(0xFFFF8A3D),
-)
 
 private data class PlanItem(
     val key: String,
@@ -79,7 +76,7 @@ fun PlanScreen(data: AppData, nav: Nav) {
                 PlanItem(
                     key = "e" + e.id, title = e.title,
                     sub = if (e.isRange) shortSpan(e.day, e.endDay) else shortDate(e.day),
-                    start = e.day, end = e.endDay, color = eventColor(e.color), progress = null,
+                    start = e.day, end = e.endDay, color = itemColor(e.color), progress = null,
                     onClick = { nav.editEvent(EventEditReq(e)) },
                 )
             )
@@ -91,7 +88,7 @@ fun PlanScreen(data: AppData, nav: Nav) {
                     PlanItem(
                         key = "g" + g.id, title = g.title,
                         sub = "${g.level.label} 목표 · ${if (g.done) "완료" else Dates.dday(g.endDay)} · ${pct(p)}%",
-                        start = g.startDay, end = g.endDay, color = Color(0xFF6B7684), progress = p,
+                        start = g.startDay, end = g.endDay, color = goalColor(g), progress = p,
                         onClick = { nav.openGoal(g.id) },
                     )
                 )
@@ -164,7 +161,7 @@ fun PlanScreen(data: AppData, nav: Nav) {
                     while (m < monthCount) {
                         val ym = firstMonth.plusMonths(m.toLong())
                         val span = minOf(12 - ym.monthValue + 1, monthCount - m)
-                        val c = YearColors[Math.floorMod(ym.year, YearColors.size)]
+                        val c = pal.yearColors[Math.floorMod(ym.year, pal.yearColors.size)]
                         Box(
                             Modifier.offset(x = mw * m + 2.dp).width(mw * span - 4.dp).height(totalH)
                                 .clip(RoundedCornerShape(12.dp))

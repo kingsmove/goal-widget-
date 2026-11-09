@@ -96,6 +96,8 @@ object Store {
 
     fun setFocusGuard(on: Boolean) = update { d -> d.copy(focusGuard = on) }
 
+    fun setTheme(block: (ThemePrefs) -> ThemePrefs) = update { d -> d.copy(theme = block(d.theme)) }
+
     // ---------- Persistence ----------
     private val file: File get() = File(app.filesDir, "data.json")
 
@@ -109,7 +111,7 @@ object Store {
                     put("id", g.id); put("title", g.title); put("level", g.level.name)
                     put("parentId", g.parentId ?: JSONObject.NULL)
                     put("start", g.startDay); put("end", g.endDay); put("done", g.done)
-                    put("memo", g.memo); put("createdAt", g.createdAt)
+                    put("memo", g.memo); put("createdAt", g.createdAt); put("color", g.color)
                 })
             }
         })
@@ -134,6 +136,16 @@ object Store {
             put("goalId", t.goalId ?: JSONObject.NULL); put("running", t.running)
             put("acc", t.accumulatedMs); put("startedAt", t.startedAtMs); put("sessionStart", t.sessionStartMs)
         })
+        val th = d.theme
+        root.put("theme", JSONObject().apply {
+            put("mode", th.mode)
+            putC("accent", th.accent)
+            putC("bgLight", th.bgLight); putC("cardLight", th.cardLight); putC("textLight", th.textLight)
+            putC("bgDark", th.bgDark); putC("cardDark", th.cardDark); putC("textDark", th.textDark)
+            put("items", JSONArray().apply { th.itemColors.forEach { put(it ?: JSONObject.NULL) } })
+            put("years", JSONArray().apply { th.yearColors.forEach { put(it ?: JSONObject.NULL) } })
+            put("levels", JSONArray().apply { th.levelColors.forEach { put(it ?: JSONObject.NULL) } })
+        })
         val tmp = File(app.filesDir, "data.json.tmp")
         tmp.writeText(root.toString())
         if (!tmp.renameTo(file)) {
@@ -141,6 +153,15 @@ object Store {
             tmp.delete()
         }
     }
+
+    private fun JSONObject.putC(key: String, v: Int?) {
+        put(key, v ?: JSONObject.NULL)
+    }
+
+    private fun JSONObject.optC(key: String): Int? = if (!has(key) || isNull(key)) null else getInt(key)
+
+    private fun JSONArray?.colors(n: Int): List<Int?> =
+        List(n) { i -> if (this == null || i >= length() || isNull(i)) null else getInt(i) }
 
     private fun JSONObject.optStr(key: String): String? = if (isNull(key) || !has(key)) null else getString(key)
 
@@ -160,6 +181,7 @@ object Store {
                     done = o.optBoolean("done"),
                     memo = o.optString("memo", ""),
                     createdAt = o.optLong("createdAt"),
+                    color = o.optInt("color", -1),
                 )
             }
         } ?: emptyList()
@@ -193,6 +215,16 @@ object Store {
             startedAtMs = t.optLong("startedAt"),
             sessionStartMs = t.optLong("sessionStart"),
         )
-        return AppData(goals, sessions, events, timer, root.optBoolean("focusGuard", true))
+        val tj = root.optJSONObject("theme")
+        val theme = if (tj == null) ThemePrefs() else ThemePrefs(
+            mode = tj.optInt("mode", 0),
+            accent = tj.optC("accent"),
+            bgLight = tj.optC("bgLight"), cardLight = tj.optC("cardLight"), textLight = tj.optC("textLight"),
+            bgDark = tj.optC("bgDark"), cardDark = tj.optC("cardDark"), textDark = tj.optC("textDark"),
+            itemColors = tj.optJSONArray("items").colors(6),
+            yearColors = tj.optJSONArray("years").colors(5),
+            levelColors = tj.optJSONArray("levels").colors(4),
+        )
+        return AppData(goals, sessions, events, timer, root.optBoolean("focusGuard", true), theme)
     }
 }
