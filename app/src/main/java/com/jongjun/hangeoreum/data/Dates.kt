@@ -95,6 +95,17 @@ object Dates {
         }
     }
 
+    /** "11/20 ~ 11/23" or "2026.12 ~ 2027.02" when spanning years. */
+    fun span(start: Long, end: Long): String {
+        val s = date(start)
+        val e = date(end)
+        return if (s.year != e.year) "${s.year}.${s.monthValue}.${s.dayOfMonth} ~ ${e.year}.${e.monthValue}.${e.dayOfMonth}"
+        else "${md(s)} ~ ${md(e)}"
+    }
+
+    fun eventWhen(day: Long, endDay: Long, minute: Int): String =
+        if (endDay > day) span(day, endDay) else "${relative(day)} · ${minuteLabel(minute)}"
+
     fun duration(ms: Long): String {
         val totalMin = ms / 60000
         val h = totalMin / 60

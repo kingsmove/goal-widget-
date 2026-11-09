@@ -124,8 +124,8 @@ object Store {
         root.put("events", JSONArray().apply {
             d.events.forEach { e ->
                 put(JSONObject().apply {
-                    put("id", e.id); put("title", e.title); put("day", e.day)
-                    put("minute", e.minute); put("memo", e.memo)
+                    put("id", e.id); put("title", e.title); put("day", e.day); put("endDay", e.endDay)
+                    put("minute", e.minute); put("memo", e.memo); put("color", e.color); put("plan", e.onPlan)
                 })
             }
         })
@@ -172,7 +172,17 @@ object Store {
         val events = root.optJSONArray("events")?.let { arr ->
             (0 until arr.length()).map { i ->
                 val o = arr.getJSONObject(i)
-                Event(o.getString("id"), o.getString("title"), o.getLong("day"), o.optInt("minute", -1), o.optString("memo", ""))
+                val day = o.getLong("day")
+                Event(
+                    id = o.getString("id"),
+                    title = o.getString("title"),
+                    day = day,
+                    endDay = maxOf(day, o.optLong("endDay", day)),
+                    minute = o.optInt("minute", -1),
+                    memo = o.optString("memo", ""),
+                    color = o.optInt("color", 0),
+                    onPlan = o.optBoolean("plan", false),
+                )
             }
         } ?: emptyList()
         val t = root.optJSONObject("timer")

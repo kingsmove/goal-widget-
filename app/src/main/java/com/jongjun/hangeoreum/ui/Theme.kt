@@ -60,6 +60,17 @@ val DarkPalette = Palette(
     green = Color(0xFF26C281),
 )
 
+val EventColors = listOf(
+    Color(0xFF3182F6), // 파랑
+    Color(0xFF00A6A6), // 청록
+    Color(0xFF8B5CF6), // 보라
+    Color(0xFFFF8A3D), // 주황
+    Color(0xFF03B26C), // 초록
+    Color(0xFFF25C8A), // 분홍
+)
+
+fun eventColor(i: Int): Color = EventColors[((i % EventColors.size) + EventColors.size) % EventColors.size]
+
 val LocalPalette = staticCompositionLocalOf { LightPalette }
 
 val Pretendard = FontFamily(

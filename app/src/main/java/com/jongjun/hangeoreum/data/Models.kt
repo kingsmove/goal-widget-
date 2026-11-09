@@ -28,14 +28,23 @@ data class Session(
     val durationMs: Long,
 )
 
-/** minute = -1 means all-day. */
+/**
+ * day..endDay (inclusive). minute = -1 means all-day.
+ * color = palette index, onPlan = shown on the long-term plan diagram.
+ */
 data class Event(
     val id: String,
     val title: String,
     val day: Long,
-    val minute: Int,
-    val memo: String,
-)
+    val endDay: Long = day,
+    val minute: Int = -1,
+    val memo: String = "",
+    val color: Int = 0,
+    val onPlan: Boolean = false,
+) {
+    val isRange: Boolean get() = endDay > day
+    fun covers(d: Long): Boolean = d in day..endDay
+}
 
 data class TimerState(
     val goalId: String? = null,

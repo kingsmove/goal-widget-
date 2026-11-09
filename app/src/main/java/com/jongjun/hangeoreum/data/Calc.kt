@@ -55,4 +55,10 @@ fun AppData.studyMsOnDay(day: Long, now: Long): Long {
 }
 
 fun AppData.upcomingEvents(today: Long = Dates.today()): List<Event> =
-    events.filter { it.day >= today }.sortedWith(compareBy<Event> { it.day }.thenBy { it.minute })
+    events.filter { it.endDay >= today }.sortedWith(compareBy<Event> { it.day }.thenBy { it.minute })
+
+fun AppData.eventsOn(day: Long): List<Event> =
+    events.filter { it.covers(day) }.sortedWith(compareBy<Event> { !it.isRange }.thenBy { it.minute }.thenBy { it.day })
+
+fun AppData.dayGoalsOn(day: Long): List<Goal> =
+    goals.filter { it.level == Level.DAY && it.endDay == day }.sortedWith(compareBy<Goal> { it.done }.thenBy { it.createdAt })

@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.jongjun.hangeoreum.data.Dates
 import com.jongjun.hangeoreum.data.Event
 import com.jongjun.hangeoreum.data.Goal
 import com.jongjun.hangeoreum.data.Level
@@ -45,10 +46,13 @@ import kotlinx.coroutines.delay
 /** Request to open the goal editor. */
 data class GoalEditReq(val existing: Goal?, val level: Level, val parentId: String?)
 
+/** Request to open the event editor. */
+data class EventEditReq(val existing: Event?, val day: Long = Dates.today(), val onPlan: Boolean = false)
+
 class Nav(
     val openGoal: (String) -> Unit,
     val editGoal: (GoalEditReq) -> Unit,
-    val editEvent: (Event?) -> Unit,
+    val editEvent: (EventEditReq) -> Unit,
     val startTimerFor: (String?) -> Unit,
     val goTab: (Int) -> Unit,
 )
@@ -59,8 +63,7 @@ fun AppRoot(resumeTick: Int, openOverlaySettings: () -> Unit) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var stack by remember { mutableStateOf(listOf<String>()) }
     var goalReq by remember { mutableStateOf<GoalEditReq?>(null) }
-    var eventReq by remember { mutableStateOf<Event?>(null) }
-    var eventSheet by remember { mutableStateOf(false) }
+    var eventReq by remember { mutableStateOf<EventEditReq?>(null) }
 
     // Clock that ticks only while a timer is active (plus on every resume).
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -76,7 +79,7 @@ fun AppRoot(resumeTick: Int, openOverlaySettings: () -> Unit) {
         Nav(
             openGoal = { id -> stack = stack + id },
             editGoal = { goalReq = it },
-            editEvent = { eventReq = it; eventSheet = true },
+            editEvent = { eventReq = it },
             startTimerFor = { id ->
                 if (id != null) Store.setTimerGoal(id)
                 stack = emptyList()
@@ -100,7 +103,8 @@ fun AppRoot(resumeTick: Int, openOverlaySettings: () -> Unit) {
                         0 -> HomeScreen(data, now, nav)
                         1 -> GoalsScreen(data, now, nav)
                         2 -> TimerScreen(data, now, nav, resumeTick, openOverlaySettings)
-                        else -> EventsScreen(data, nav)
+                        3 -> CalendarScreen(data, now, nav)
+                        else -> PlanScreen(data, nav)
                     }
                 }
             }
@@ -129,7 +133,7 @@ fun AppRoot(resumeTick: Int, openOverlaySettings: () -> Unit) {
     }
 
     goalReq?.let { req -> GoalEditorSheet(req, data) { goalReq = null } }
-    if (eventSheet) EventEditorSheet(eventReq) { eventSheet = false; eventReq = null }
+    eventReq?.let { req -> EventEditorSheet(req) { eventReq = null } }
 }
 
 @Composable
@@ -138,7 +142,8 @@ private fun BottomBar(tab: Int, onSelect: (Int) -> Unit) {
         AppIcons.Home to "홈",
         AppIcons.Flag to "목표",
         AppIcons.Timer to "타이머",
-        AppIcons.Calendar to "일정",
+        AppIcons.Calendar to "캘린더",
+        AppIcons.Plan to "플랜",
     )
     Column(Modifier.fillMaxWidth().background(pal.card).navigationBarsPadding()) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(pal.line))

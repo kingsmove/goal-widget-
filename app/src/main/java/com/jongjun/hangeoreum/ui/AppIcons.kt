@@ -21,5 +21,6 @@ object AppIcons {
         "calendar",
         "M17,12h-5v5h5v-5zM16,1v2H8V1H6v2H5c-1.11,0 -1.99,0.9 -1.99,2L3,19c0,1.1 0.89,2 2,2h14c1.1,0 2,-0.9 2,-2V5c0,-1.1 -0.9,-2 -2,-2h-1V1h-2zM19,19H5V8h14v11z"
     )
+    val Plan = icon("plan", "M3,4h11v4H3zM8,10h13v4H8zM5,16h10v4H5z")
     val Home = icon("home", "M10,20v-6h4v6h5v-8h3L12,3 2,12h3v8z")
 }

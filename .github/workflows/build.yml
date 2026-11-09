@@ -32,5 +32,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: 한걸음 v1.0 (빌드 ${{ github.run_number }})
+          name: 한걸음 v1.1 (빌드 ${{ github.run_number }})
           files: hangeoreum-*.apk

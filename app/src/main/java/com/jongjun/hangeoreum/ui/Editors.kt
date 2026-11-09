@@ -4,7 +4,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -145,14 +152,20 @@ private fun placeholder(level: Level) = when (level) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EventEditorSheet(event: Event?, onDismiss: () -> Unit) {
+fun EventEditorSheet(req: EventEditReq, onDismiss: () -> Unit) {
+    val event = req.existing
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     var title by remember { mutableStateOf(event?.title ?: "") }
     var memo by remember { mutableStateOf(event?.memo ?: "") }
-    var day by remember { mutableLongStateOf(event?.day ?: Dates.today()) }
+    var day by remember { mutableLongStateOf(event?.day ?: req.day) }
+    var endDay by remember { mutableLongStateOf(event?.endDay ?: req.day) }
+    var ranged by remember { mutableStateOf(event?.isRange ?: req.onPlan) }
     var minute by remember { mutableIntStateOf(event?.minute ?: -1) }
-    var showDate by remember { mutableStateOf(false) }
+    var color by remember { mutableIntStateOf(event?.color ?: 0) }
+    var onPlan by remember { mutableStateOf(event?.onPlan ?: req.onPlan) }
+    // which date is being picked: 0 = none, 1 = start, 2 = end
+    var pickDate by remember { mutableIntStateOf(0) }
     var showTime by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) {
@@ -166,6 +179,11 @@ fun EventEditorSheet(event: Event?, onDismiss: () -> Unit) {
         scope.launch { state.hide() }.invokeOnCompletion { onDismiss() }
     }
 
+    val switchColors = SwitchDefaults.colors(
+        checkedThumbColor = Color.White, checkedTrackColor = pal.blue,
+        uncheckedThumbColor = Color.White, uncheckedTrackColor = pal.line, uncheckedBorderColor = Color.Transparent,
+    )
+
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state, containerColor = pal.card) {
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)
@@ -174,35 +192,67 @@ fun EventEditorSheet(event: Event?, onDismiss: () -> Unit) {
             T(if (event == null) "새 일정" else "일정 수정", 22, weight = FontWeight.Bold)
 
             FieldLabel("무슨 일정인가요?")
-            InputField(title, { title = it }, "예: 친구랑 저녁 약속", focusRequester = focus)
+            InputField(title, { title = it }, if (req.onPlan) "예: 졸업설계, 인턴, 여행" else "예: 친구랑 저녁 약속", focusRequester = focus)
 
-            FieldLabel("날짜")
-            val today = Dates.today()
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ChoiceChip("오늘", day == today) { day = today }
-                ChoiceChip("내일", day == today + 1) { day = today + 1 }
-                ChoiceChip(if (day != today && day != today + 1) Dates.full(day) else "날짜 선택", day != today && day != today + 1) {
-                    showDate = true
+            Row(Modifier.padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                T("여러 날 이어지는 일정", 15, Modifier.weight(1f), weight = FontWeight.Medium)
+                Switch(checked = ranged, onCheckedChange = { on ->
+                    ranged = on
+                    if (on) { minute = -1; if (endDay <= day) endDay = day + 2 } else endDay = day
+                }, colors = switchColors)
+            }
+
+            if (ranged) {
+                FieldLabel("기간")
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ChoiceChip(fullDate(day), true) { pickDate = 1 }
+                    T("~", 16, color = pal.sub)
+                    ChoiceChip(fullDate(endDay), true) { pickDate = 2 }
+                }
+                T("${endDay - day + 1}일", 13, Modifier.padding(top = 8.dp), color = pal.sub)
+            } else {
+                FieldLabel("날짜")
+                val today = Dates.today()
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ChoiceChip("오늘", day == today) { day = today; endDay = today }
+                    ChoiceChip("내일", day == today + 1) { day = today + 1; endDay = today + 1 }
+                    val other = day != today && day != today + 1
+                    ChoiceChip(if (other) fullDate(day) else "날짜 선택", other) { pickDate = 1 }
+                }
+
+                FieldLabel("시간")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.weight(1f)) {
+                        if (minute >= 0) ChoiceChip(Dates.minuteLabel(minute), true) { showTime = true }
+                        else T("하루 종일", 16, weight = FontWeight.Medium, color = pal.sub)
+                    }
+                    T("시간 지정", 14, Modifier.padding(end = 10.dp), color = pal.sub)
+                    Switch(
+                        checked = minute >= 0,
+                        onCheckedChange = { on -> if (on) { minute = 9 * 60; showTime = true } else minute = -1 },
+                        colors = switchColors,
+                    )
                 }
             }
 
-            FieldLabel("시간")
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Row(Modifier.weight(1f)) {
-                    if (minute >= 0) ChoiceChip(Dates.minuteLabel(minute), true) { showTime = true }
-                    else T("하루 종일", 16, weight = FontWeight.Medium, color = pal.sub)
+            FieldLabel("색상")
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                EventColors.forEachIndexed { i, c ->
+                    androidx.compose.foundation.layout.Box(
+                        Modifier.size(34.dp).clip(CircleShape).background(c).bounceClick { color = i },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (i == color) Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
                 }
-                T("시간 지정", 14, Modifier.padding(end = 10.dp), color = pal.sub)
-                Switch(
-                    checked = minute >= 0,
-                    onCheckedChange = { on ->
-                        if (on) { minute = 9 * 60; showTime = true } else minute = -1
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White, checkedTrackColor = pal.blue,
-                        uncheckedThumbColor = Color.White, uncheckedTrackColor = pal.line, uncheckedBorderColor = Color.Transparent,
-                    ),
-                )
+            }
+
+            Row(Modifier.padding(top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    T("장기 플랜에 표시", 15, weight = FontWeight.Medium)
+                    T("플랜 탭의 다이어그램에 나와요", 13, color = pal.sub)
+                }
+                Switch(checked = onPlan, onCheckedChange = { onPlan = it }, colors = switchColors)
             }
 
             FieldLabel("메모 (선택)")
@@ -210,8 +260,18 @@ fun EventEditorSheet(event: Event?, onDismiss: () -> Unit) {
 
             VGap(28.dp)
             PrimaryButton(if (event == null) "추가하기" else "저장하기", Modifier.fillMaxWidth(), enabled = title.isNotBlank()) {
+                val end = if (ranged) maxOf(day, endDay) else day
                 Store.upsertEvent(
-                    Event(event?.id ?: Store.newId(), title.trim(), day, minute, memo.trim())
+                    Event(
+                        id = event?.id ?: Store.newId(),
+                        title = title.trim(),
+                        day = day,
+                        endDay = end,
+                        minute = if (end > day) -1 else minute,
+                        memo = memo.trim(),
+                        color = color,
+                        onPlan = onPlan,
+                    )
                 )
                 close()
             }
@@ -225,22 +285,30 @@ fun EventEditorSheet(event: Event?, onDismiss: () -> Unit) {
         }
     }
 
-    if (showDate) {
+    if (pickDate != 0) {
+        val initial = if (pickDate == 1) day else endDay
         val dpState = rememberDatePickerState(
-            initialSelectedDateMillis = LocalDate.ofEpochDay(day).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+            initialSelectedDateMillis = LocalDate.ofEpochDay(initial).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
         )
         DatePickerDialog(
-            onDismissRequest = { showDate = false },
+            onDismissRequest = { pickDate = 0 },
             confirmButton = {
                 TextButton(onClick = {
                     dpState.selectedDateMillis?.let {
-                        day = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
+                        val picked = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
+                        if (pickDate == 1) {
+                            val len = endDay - day
+                            day = picked
+                            endDay = if (ranged) picked + maxOf(len, 0L) else picked
+                        } else {
+                            endDay = maxOf(picked, day)
+                        }
                     }
-                    showDate = false
+                    pickDate = 0
                 }) { T("확인", 16, weight = FontWeight.SemiBold, color = pal.blue) }
             },
             dismissButton = {
-                TextButton(onClick = { showDate = false }) { T("취소", 16, weight = FontWeight.SemiBold, color = pal.sub) }
+                TextButton(onClick = { pickDate = 0 }) { T("취소", 16, weight = FontWeight.SemiBold, color = pal.sub) }
             },
         ) {
             DatePicker(state = dpState, showModeToggle = false)
@@ -268,4 +336,9 @@ fun EventEditorSheet(event: Event?, onDismiss: () -> Unit) {
             },
         )
     }
+}
+
+private fun fullDate(day: Long): String {
+    val d = Dates.date(day)
+    return if (d.year == LocalDate.now().year) Dates.full(day) else "${d.year}. ${Dates.full(day)}"
 }

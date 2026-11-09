@@ -100,9 +100,9 @@ fun HomeScreen(data: AppData, now: Long, nav: Nav) {
 
         item {
             CardBox {
-                SectionTitle("다가오는 일정", "+ 추가") { nav.editEvent(null) }
+                SectionTitle("다가오는 일정", "+ 추가") { nav.editEvent(EventEditReq(null)) }
                 if (events.isEmpty()) EmptyNote("예정된 일정이 없어요")
-                events.forEach { e -> EventRow(e) { nav.editEvent(e) } }
+                events.forEach { e -> EventRow(e) { nav.editEvent(EventEditReq(e)) } }
             }
         }
     }
@@ -160,18 +160,19 @@ fun EventRow(e: Event, onClick: () -> Unit) {
         Modifier.fillMaxWidth().bounceClick(onClick = onClick).padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val ec = eventColor(e.color)
         Column(
-            Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(pal.fill),
+            Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(ec.copy(alpha = 0.12f)),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            T("${d.monthValue}월", 11, weight = FontWeight.Medium, color = pal.sub)
-            T("${d.dayOfMonth}", 17, weight = FontWeight.Bold)
+            T("${d.monthValue}월", 11, weight = FontWeight.Medium, color = ec)
+            T("${d.dayOfMonth}", 17, weight = FontWeight.Bold, color = ec)
         }
         Gap(14.dp)
         Column(Modifier.weight(1f)) {
             T(e.title, 16, weight = FontWeight.SemiBold, maxLines = 1)
-            T("${Dates.relative(e.day)} · ${Dates.minuteLabel(e.minute)}", 13, Modifier.padding(top = 2.dp), color = pal.sub, maxLines = 1)
+            T(Dates.eventWhen(e.day, e.endDay, e.minute), 13, Modifier.padding(top = 2.dp), color = pal.sub, maxLines = 1)
         }
     }
 }
