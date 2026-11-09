@@ -180,7 +180,7 @@ fun EventRow(e: Event, onClick: () -> Unit) {
         Modifier.fillMaxWidth().bounceClick(onClick = onClick).padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val ec = itemColor(e.color)
+        val ec = eventColorOf(e)
         Column(
             Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(ec.copy(alpha = 0.12f)),
             horizontalAlignment = Alignment.CenterHorizontally,

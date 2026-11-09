@@ -76,7 +76,7 @@ fun PlanScreen(data: AppData, nav: Nav) {
                 PlanItem(
                     key = "e" + e.id, title = e.title,
                     sub = if (e.isRange) shortSpan(e.day, e.endDay) else shortDate(e.day),
-                    start = e.day, end = e.endDay, color = itemColor(e.color), progress = null,
+                    start = e.day, end = e.endDay, color = eventColorOf(e), progress = null,
                     onClick = { nav.editEvent(EventEditReq(e)) },
                 )
             )
@@ -240,6 +240,7 @@ fun PlanScreen(data: AppData, nav: Nav) {
             "막대를 누르면 수정할 수 있어요 · 일정 추가 시 ‘장기 플랜에 표시’를 켜면 여기에 나와요", 12,
             Modifier.padding(horizontal = 28.dp, vertical = 12.dp), color = pal.sub,
         )
+        Box(Modifier.padding(horizontal = 20.dp)) { CanvasImportCard(data) }
     }
 }
 

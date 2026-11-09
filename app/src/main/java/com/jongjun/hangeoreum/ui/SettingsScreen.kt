@@ -178,6 +178,8 @@ fun SettingsScreen(data: AppData, onBack: () -> Unit, update: UpdateInfo?, onUpd
                 }
             }
 
+            item { CanvasImportCard(data) }
+
             item { UpdateCard(update, onUpdateChecked) }
         }
     }

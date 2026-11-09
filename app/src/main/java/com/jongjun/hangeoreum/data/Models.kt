@@ -43,6 +43,10 @@ data class Event(
     val memo: String = "",
     val color: Int = 0,
     val onPlan: Boolean = false,
+    /** Exact ARGB color (e.g. from an Obsidian canvas); overrides [color]. */
+    val customColor: Int? = null,
+    /** "" = made in the app, "canvas" = imported from Obsidian. */
+    val source: String = "",
 ) {
     val isRange: Boolean get() = endDay > day
     fun covers(d: Long): Boolean = d in day..endDay

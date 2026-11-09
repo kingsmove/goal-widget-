@@ -178,6 +178,7 @@ fun EventEditorSheet(req: EventEditReq, onDismiss: () -> Unit) {
     var ranged by remember { mutableStateOf(event?.isRange ?: req.onPlan) }
     var minute by remember { mutableIntStateOf(event?.minute ?: -1) }
     var color by remember { mutableIntStateOf(event?.color ?: 0) }
+    var keepCustom by remember { mutableStateOf(event?.customColor != null) }
     var onPlan by remember { mutableStateOf(event?.onPlan ?: req.onPlan) }
     // which date is being picked: 0 = none, 1 = start, 2 = end
     var pickDate by remember { mutableIntStateOf(0) }
@@ -254,10 +255,10 @@ fun EventEditorSheet(req: EventEditReq, onDismiss: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 pal.itemColors.forEachIndexed { i, c ->
                     androidx.compose.foundation.layout.Box(
-                        Modifier.size(34.dp).clip(CircleShape).background(c).bounceClick { color = i },
+                        Modifier.size(34.dp).clip(CircleShape).background(c).bounceClick { color = i; keepCustom = false },
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (i == color) Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        if (i == color && !keepCustom) Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
                     }
                 }
             }
@@ -286,6 +287,8 @@ fun EventEditorSheet(req: EventEditReq, onDismiss: () -> Unit) {
                         memo = memo.trim(),
                         color = color,
                         onPlan = onPlan,
+                        customColor = if (keepCustom) event?.customColor else null,
+                        source = event?.source ?: "",
                     )
                 )
                 close()

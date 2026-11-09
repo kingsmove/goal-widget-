@@ -90,6 +90,11 @@ class MainActivity : ComponentActivity() {
         launchExternal(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
     }
 
+    /** Call right before launching a system picker so leaving the app doesn't count as a focus break. */
+    fun expectExternal() {
+        suppressGuard = true
+    }
+
     /** Opens another screen (settings, installer) without triggering the focus warning. */
     fun launchExternal(intent: Intent) {
         suppressGuard = true
