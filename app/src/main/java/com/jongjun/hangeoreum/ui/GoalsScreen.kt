@@ -63,6 +63,10 @@ fun GoalsScreen(data: AppData, now: Long, nav: Nav) {
                 T("목표", 26, Modifier.weight(1f), weight = FontWeight.Bold)
                 Box(
                     Modifier.padding(end = 8.dp).clip(RoundedCornerShape(12.dp)).background(pal.card)
+                        .bounceClick { nav.openGantt() }.padding(horizontal = 12.dp, vertical = 9.dp)
+                ) { T("공정표", 14, weight = FontWeight.SemiBold, color = pal.blue) }
+                Box(
+                    Modifier.padding(end = 8.dp).clip(RoundedCornerShape(12.dp)).background(pal.card)
                         .bounceClick { examSheet = true }.padding(horizontal = 12.dp, vertical = 9.dp)
                 ) { T("시험 플랜", 14, weight = FontWeight.SemiBold, color = pal.blue) }
                 IconCircle(Icons.Filled.Add, { nav.editGoal(GoalEditReq(null, level, null)) }, tint = pal.blue, bg = pal.card)
