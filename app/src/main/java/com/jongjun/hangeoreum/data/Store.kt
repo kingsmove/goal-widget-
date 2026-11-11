@@ -125,6 +125,34 @@ object Store {
     // ---------- Timer ----------
     fun setTimerGoal(goalId: String?) = update { d -> d.copy(timer = d.timer.copy(goalId = goalId)) }
 
+    fun setTimerSubject(id: String?) = update { d -> d.copy(timer = d.timer.copy(subjectId = id)) }
+
+    fun addSession(s: Session) = update { d -> d.copy(sessions = d.sessions + s) }
+
+    // ---------- Subjects / quotes / notes ----------
+    fun upsertSubject(s: Subject) = update { d ->
+        val exists = d.subjects.any { it.id == s.id }
+        d.copy(subjects = if (exists) d.subjects.map { if (it.id == s.id) s else it } else d.subjects + s)
+    }
+
+    fun deleteSubject(id: String) = update { d ->
+        d.copy(
+            subjects = d.subjects.filterNot { it.id == id },
+            timer = if (d.timer.subjectId == id) d.timer.copy(subjectId = null) else d.timer,
+        )
+    }
+
+    fun upsertQuote(q: Quote) = update { d ->
+        val exists = d.quotes.any { it.id == q.id }
+        d.copy(quotes = if (exists) d.quotes.map { if (it.id == q.id) q else it } else d.quotes + q)
+    }
+
+    fun deleteQuote(id: String) = update { d -> d.copy(quotes = d.quotes.filterNot { it.id == id }) }
+
+    fun setDayNote(day: Long, text: String) = update { d ->
+        d.copy(dayNotes = if (text.isBlank()) d.dayNotes - day else d.dayNotes + (day to text))
+    }
+
     fun startTimer() = update { d ->
         val t = d.timer
         if (t.running) d else {
@@ -153,9 +181,9 @@ object Store {
         val now = System.currentTimeMillis()
         val elapsed = t.elapsed(now)
         val sessions = if (elapsed >= 10_000L) {
-            d.sessions + Session(newId(), t.goalId, t.sessionStartMs.takeIf { it > 0 } ?: (now - elapsed), elapsed)
+            d.sessions + Session(newId(), t.goalId, t.sessionStartMs.takeIf { it > 0 } ?: (now - elapsed), elapsed, t.subjectId)
         } else d.sessions
-        d.copy(sessions = sessions, timer = TimerState(goalId = t.goalId))
+        d.copy(sessions = sessions, timer = TimerState(goalId = t.goalId, subjectId = t.subjectId))
     }
 
     fun deleteSession(id: String) = update { d -> d.copy(sessions = d.sessions.filterNot { it.id == id }) }
@@ -208,7 +236,7 @@ object Store {
             d.sessions.forEach { s ->
                 put(JSONObject().apply {
                     put("id", s.id); put("goalId", s.goalId ?: JSONObject.NULL)
-                    put("start", s.startMs); put("dur", s.durationMs)
+                    put("start", s.startMs); put("dur", s.durationMs); put("sub", s.subjectId ?: JSONObject.NULL)
                 })
             }
         })
@@ -223,7 +251,7 @@ object Store {
         })
         val t = d.timer
         root.put("timer", JSONObject().apply {
-            put("goalId", t.goalId ?: JSONObject.NULL); put("running", t.running)
+            put("goalId", t.goalId ?: JSONObject.NULL); put("running", t.running); put("sub", t.subjectId ?: JSONObject.NULL)
             put("acc", t.accumulatedMs); put("startedAt", t.startedAtMs); put("sessionStart", t.sessionStartMs)
         })
         val th = d.theme
@@ -246,6 +274,17 @@ object Store {
             }
         })
         root.put("routineSkips", JSONArray().apply { d.routineSkips.forEach { put(it) } })
+        root.put("subjects", JSONArray().apply {
+            d.subjects.forEach { s -> put(JSONObject().apply { put("id", s.id); put("name", s.name); put("color", s.color) }) }
+        })
+        root.put("quotes", JSONArray().apply {
+            d.quotes.forEach { q ->
+                put(JSONObject().apply {
+                    put("id", q.id); put("text", q.text); put("who", q.who); put("day", q.day); put("createdAt", q.createdAt)
+                })
+            }
+        })
+        root.put("dayNotes", JSONObject().apply { d.dayNotes.forEach { (k, v) -> put(k.toString(), v) } })
         val n = d.notif
         root.put("notif", JSONObject().apply {
             put("events", n.events); put("lead", n.eventLeadMin); put("ddays", n.ddays)
@@ -302,7 +341,7 @@ object Store {
         val sessions = root.optJSONArray("sessions")?.let { arr ->
             (0 until arr.length()).map { i ->
                 val o = arr.getJSONObject(i)
-                Session(o.getString("id"), o.optStr("goalId"), o.getLong("start"), o.getLong("dur"))
+                Session(o.getString("id"), o.optStr("goalId"), o.getLong("start"), o.getLong("dur"), o.optStr("sub"))
             }
         } ?: emptyList()
         val events = root.optJSONArray("events")?.let { arr ->
@@ -327,6 +366,7 @@ object Store {
         val t = root.optJSONObject("timer")
         val timer = if (t == null) TimerState() else TimerState(
             goalId = t.optStr("goalId"),
+            subjectId = t.optStr("sub"),
             running = t.optBoolean("running"),
             accumulatedMs = t.optLong("acc"),
             startedAtMs = t.optLong("startedAt"),
@@ -360,9 +400,23 @@ object Store {
             morning = nj.optBoolean("morning", true), morningMin = nj.optInt("morningMin", 480),
             evening = nj.optBoolean("evening", true), eveningMin = nj.optInt("eveningMin", 1260),
         )
+        val subjects = root.optJSONArray("subjects")?.let { arr ->
+            (0 until arr.length()).map { i -> arr.getJSONObject(i).let { Subject(it.getString("id"), it.getString("name"), it.optInt("color")) } }
+        } ?: emptyList()
+        val quotes = root.optJSONArray("quotes")?.let { arr ->
+            (0 until arr.length()).map { i ->
+                arr.getJSONObject(i).let {
+                    Quote(it.getString("id"), it.getString("text"), it.optString("who", ""), it.optLong("day"), it.optLong("createdAt"))
+                }
+            }
+        } ?: emptyList()
+        val notes = root.optJSONObject("dayNotes")?.let { o ->
+            o.keys().asSequence().mapNotNull { k -> k.toLongOrNull()?.let { it to o.getString(k) } }.toMap()
+        } ?: emptyMap()
         return AppData(
             goals, sessions, events, timer, root.optBoolean("focusGuard", true), theme,
             routines = routines, routineSkips = skips, notif = notif,
+            subjects = subjects, quotes = quotes, dayNotes = notes,
         )
     }
 }

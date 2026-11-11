@@ -60,6 +60,8 @@ data class EventEditReq(
 const val SETTINGS = "__settings"
 const val STATS = "__stats"
 const val GANTT = "__gantt"
+const val PLANNER = "__planner"
+const val QUOTES = "__quotes"
 
 class Nav(
     val openGoal: (String) -> Unit,
@@ -69,6 +71,8 @@ class Nav(
     val goTab: (Int) -> Unit,
     val openStats: () -> Unit = {},
     val openGantt: () -> Unit = {},
+    val openPlanner: () -> Unit = {},
+    val openQuotes: () -> Unit = {},
 )
 
 @Composable
@@ -102,6 +106,8 @@ fun AppRoot(resumeTick: Int, openOverlaySettings: () -> Unit, tabRequest: Pair<I
             goTab = { tab = it },
             openStats = { stack = stack + STATS },
             openGantt = { stack = stack + GANTT },
+            openPlanner = { stack = stack + PLANNER },
+            openQuotes = { stack = stack + QUOTES },
         )
     }
 
@@ -144,7 +150,11 @@ fun AppRoot(resumeTick: Int, openOverlaySettings: () -> Unit, tabRequest: Pair<I
             val last = stack.lastOrNull()
             if (last != null) {
                 Box(Modifier.fillMaxSize().background(pal.bg).statusBarsPadding().navigationBarsPadding()) {
-                    if (last == GANTT) {
+                    if (last == PLANNER) {
+                        PlannerScreen(data, now, nav) { stack = stack.dropLast(1) }
+                    } else if (last == QUOTES) {
+                        QuotesScreen(data) { stack = stack.dropLast(1) }
+                    } else if (last == GANTT) {
                         GanttScreen(data, nav) { stack = stack.dropLast(1) }
                     } else if (last == STATS) {
                         StatsScreen(data, now) { stack = stack.dropLast(1) }

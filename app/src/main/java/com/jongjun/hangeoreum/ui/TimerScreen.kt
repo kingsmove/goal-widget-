@@ -52,6 +52,7 @@ fun TimerScreen(data: AppData, now: Long, nav: Nav, resumeTick: Int, openOverlay
     val today = Dates.today()
     val goal = data.goal(t.goalId)
     var picker by remember { mutableStateOf(false) }
+    var subjectsSheet by remember { mutableStateOf(false) }
     // re-evaluated on every resume (after returning from the permission screen)
     val canDraw = remember(resumeTick) { FocusGuard.canDraw(ctx) }
     val todaySessions = data.sessions.filter { Dates.dayOfMs(it.startMs) == today }.sortedByDescending { it.startMs }
@@ -65,9 +66,13 @@ fun TimerScreen(data: AppData, now: Long, nav: Nav, resumeTick: Int, openOverlay
             Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 T("타이머", 26, Modifier.weight(1f), weight = FontWeight.Bold)
                 Box(
+                    Modifier.padding(end = 8.dp).clip(RoundedCornerShape(12.dp)).background(pal.card)
+                        .bounceClick { nav.openPlanner() }.padding(horizontal = 12.dp, vertical = 9.dp)
+                ) { T("플래너", 14, weight = FontWeight.SemiBold, color = pal.blue) }
+                Box(
                     Modifier.clip(RoundedCornerShape(12.dp)).background(pal.card)
                         .bounceClick { nav.openStats() }.padding(horizontal = 12.dp, vertical = 9.dp)
-                ) { T("통계 보기", 14, weight = FontWeight.SemiBold, color = pal.blue) }
+                ) { T("통계", 14, weight = FontWeight.SemiBold, color = pal.blue) }
             }
         }
         item {
@@ -85,6 +90,8 @@ fun TimerScreen(data: AppData, now: Long, nav: Nav, resumeTick: Int, openOverlay
                     }
                     Icon(Icons.Filled.KeyboardArrowDown, null, tint = pal.sub)
                 }
+                T("과목", 12, Modifier.padding(top = 14.dp, bottom = 8.dp), weight = FontWeight.Medium, color = pal.sub)
+                SubjectChips(data, t.subjectId, onManage = { subjectsSheet = true }) { Store.setTimerSubject(it) }
 
                 Box(Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 8.dp), contentAlignment = Alignment.Center) {
                     val ringP = ((elapsed / 1000) % 3600) / 3600f
@@ -162,7 +169,7 @@ fun TimerScreen(data: AppData, now: Long, nav: Nav, resumeTick: Int, openOverlay
                 todaySessions.forEach { s ->
                     Row(Modifier.fillMaxWidth().padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            T(data.goal(s.goalId)?.title ?: "자유 공부", 15, weight = FontWeight.Medium, maxLines = 1)
+                            T(sessionLabel(data, s), 15, weight = FontWeight.Medium, maxLines = 1)
                             T("${Dates.hm(s.startMs)} – ${Dates.hm(s.startMs + s.durationMs)}", 13, color = pal.sub)
                         }
                         T(Dates.duration(s.durationMs), 15, weight = FontWeight.SemiBold)
@@ -172,6 +179,7 @@ fun TimerScreen(data: AppData, now: Long, nav: Nav, resumeTick: Int, openOverlay
         }
     }
 
+    if (subjectsSheet) SubjectsSheet(data) { subjectsSheet = false }
     if (picker) GoalPickerSheet(data, t.goalId, onDismiss = { picker = false }) {
         Store.setTimerGoal(it)
         picker = false

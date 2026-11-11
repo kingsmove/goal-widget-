@@ -73,7 +73,14 @@ data class Session(
     val goalId: String?,
     val startMs: Long,
     val durationMs: Long,
+    val subjectId: String? = null,
 )
+
+/** A study subject for the daily planner (e.g. 시공, 법규). */
+data class Subject(val id: String, val name: String, val color: Int)
+
+/** Something nice someone said. */
+data class Quote(val id: String, val text: String, val who: String, val day: Long, val createdAt: Long)
 
 /**
  * day..endDay (inclusive). minute = -1 means all-day.
@@ -102,6 +109,7 @@ data class Event(
 
 data class TimerState(
     val goalId: String? = null,
+    val subjectId: String? = null,
     val running: Boolean = false,
     val accumulatedMs: Long = 0L,
     val startedAtMs: Long = 0L,
@@ -137,4 +145,8 @@ data class AppData(
     /** ids of routine to-dos the user deleted for a day, so they aren't recreated. */
     val routineSkips: Set<String> = emptySet(),
     val notif: NotifPrefs = NotifPrefs(),
+    val subjects: List<Subject> = emptyList(),
+    val quotes: List<Quote> = emptyList(),
+    /** one-line memo per day (epochDay -> text) for the daily planner */
+    val dayNotes: Map<Long, String> = emptyMap(),
 )

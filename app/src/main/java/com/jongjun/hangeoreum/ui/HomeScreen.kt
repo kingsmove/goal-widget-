@@ -98,6 +98,8 @@ fun HomeScreen(data: AppData, now: Long, nav: Nav, update: UpdateInfo?, openSett
             }
         }
 
+        item { QuoteCard(data, nav.openQuotes) }
+
         item {
             CardBox {
                 SectionTitle("오늘 할 일", "+ 추가") { nav.editGoal(GoalEditReq(null, Level.DAY, null)) }
