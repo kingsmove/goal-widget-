@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>VOCA</title>
+<style>
+@font-face{font-family:P;src:url(fonts/pretendard_regular.otf);font-weight:400}
+@font-face{font-family:P;src:url(fonts/pretendard_semibold.otf);font-weight:600}
+@font-face{font-family:P;src:url(fonts/pretendard_bold.otf);font-weight:700}
+:root{
+  --bg:#F2F4F6;--card:#FFFFFF;--tx:#191F28;--sub:#6B7684;--mute:#B0B8C1;--line:#E5E8EB;
+  --pri:#3182F6;--pri-weak:#E8F3FF;--red:#F04452;--red-weak:#FFEEEE;--grn:#00B386;--org:#F2761D;
+  --shadow:0 2px 12px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#101013;--card:#1C1C21;--tx:#F2F4F6;--sub:#9EA6B0;--mute:#5C636B;--line:#2C2C33;
+  --pri:#4C94F8;--pri-weak:#1B2A40;--red:#F25A66;--red-weak:#3A1D21;--shadow:none;
+}}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{font-family:P,-apple-system,sans-serif;background:var(--bg);color:var(--tx);font-size:15px;letter-spacing:-.2px;overscroll-behavior:none;user-select:none;-webkit-user-select:none}
+input,textarea,select,button{font:inherit;color:inherit;letter-spacing:inherit}
+button{border:0;background:none;cursor:pointer}
+.app{max-width:520px;margin:0 auto;min-height:100%;padding:12px 20px calc(96px + env(safe-area-inset-bottom))}
+h1{font-size:24px;font-weight:700;margin:18px 0 18px}
+h2{font-size:18px;font-weight:700;margin:26px 0 12px}
+.box{background:var(--card);border-radius:20px;padding:20px;box-shadow:var(--shadow);margin-bottom:12px}
+.row{display:flex;align-items:center;gap:12px}
+.sp{flex:1}
+.sub{color:var(--sub);font-size:13px}
+.btn{display:block;width:100%;height:54px;border-radius:14px;background:var(--pri);color:#fff;font-weight:600;font-size:16px;transition:transform .1s}
+.btn:active{transform:scale(.98)}
+.btn.ghost{background:var(--pri-weak);color:var(--pri)}
+.btn.gray{background:var(--line);color:var(--tx)}
+.btn.danger{background:var(--red-weak);color:var(--red)}
+.btn:disabled{opacity:.4}
+.sm{height:36px;padding:0 14px;border-radius:10px;font-size:14px;font-weight:600;background:var(--pri-weak);color:var(--pri);display:inline-flex;align-items:center}
+/* home */
+.hero .big{font-size:40px;font-weight:700;letter-spacing:-1px}
+.hero .lbl{font-size:13px;color:var(--sub);margin-bottom:2px}
+.hero .nums{display:flex;gap:28px;margin:6px 0 20px}
+.streak{font-size:13px;font-weight:600;color:var(--org);background:rgba(242,118,29,.12);padding:6px 10px;border-radius:999px}
+.deck{display:flex;align-items:center;gap:14px;padding:18px 20px}
+.deck .dot{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;font-weight:700;color:#fff;font-size:15px;flex:none}
+.deck .nm{font-weight:600;font-size:16px}
+.deck .cnt{font-size:13px;color:var(--sub);margin-top:3px}
+.deck .cnt b{color:var(--pri);font-weight:600}
+.deck .cnt i{font-style:normal;color:var(--grn);font-weight:600}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:9px;display:flex}
+.bar span{display:block;height:100%}
+/* tabs */
+.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:5}
+.tabs button{flex:1;height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px;color:var(--mute);font-weight:600}
+.tabs button.on{color:var(--tx)}
+.tabs svg{width:24px;height:24px}
+/* study */
+.study{position:fixed;inset:0;background:var(--bg);z-index:10;display:flex;flex-direction:column;padding:12px 20px calc(16px + env(safe-area-inset-bottom));max-width:520px;margin:0 auto}
+.stop{display:flex;align-items:center;gap:12px;height:44px}
+.prog{flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.prog span{display:block;height:100%;background:var(--pri);transition:width .3s}
+.flash{flex:1;margin:16px 0;background:var(--card);border-radius:24px;box-shadow:var(--shadow);display:flex;flex-direction:column;padding:24px;position:relative;overflow:auto}
+.flash .tag{font-size:12px;font-weight:600;padding:5px 9px;border-radius:8px;align-self:flex-start}
+.flash .q{font-size:28px;font-weight:700;line-height:1.35;margin:auto 0;text-align:center;word-break:keep-all;padding:24px 0}
+.flash .q.long{font-size:21px}
+.flash .a{border-top:1px solid var(--line);padding-top:20px;text-align:center;animation:up .25s}
+.flash .a .m{font-size:21px;font-weight:600;line-height:1.45;word-break:keep-all}
+.flash .a .ex{font-size:14px;color:var(--sub);margin-top:10px;line-height:1.5;word-break:keep-all}
+.flash .state{position:absolute;top:24px;right:24px;font-size:12px;color:var(--mute);font-weight:600}
+@keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.rate{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.rate button{height:66px;border-radius:14px;background:var(--card);box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-weight:600;font-size:15px}
+.rate button small{font-size:12px;color:var(--sub);font-weight:400}
+.rate .r1{color:var(--red)}.rate .r2{color:var(--org)}.rate .r3{color:var(--pri)}.rate .r4{color:var(--grn)}
+.done{text-align:center;margin:auto 0}
+.done .em{font-size:56px}
+.done .t{font-size:22px;font-weight:700;margin:12px 0 6px}
+/* list */
+.search{width:100%;height:46px;border-radius:12px;border:0;background:var(--card);padding:0 16px;outline:none;box-shadow:var(--shadow);margin-bottom:12px;user-select:text}
+.word{display:flex;align-items:center;gap:10px;padding:14px 0;border-bottom:1px solid var(--line)}
+.word:last-child{border:0}
+.word .f{font-weight:600;word-break:keep-all}
+.word .b{font-size:13px;color:var(--sub);margin-top:2px;word-break:keep-all}
+.pill{font-size:11px;font-weight:600;padding:3px 7px;border-radius:6px;flex:none}
+.p-new{background:var(--line);color:var(--sub)}
+.p-lrn{background:var(--red-weak);color:var(--red)}
+.p-yng{background:var(--pri-weak);color:var(--pri)}
+.p-mat{background:rgba(0,179,134,.13);color:var(--grn)}
+.chips{display:flex;gap:8px;overflow-x:auto;margin-bottom:12px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{height:36px;padding:0 14px;border-radius:999px;background:var(--card);font-weight:600;font-size:14px;white-space:nowrap;color:var(--sub);box-shadow:var(--shadow)}
+.chip.on{background:var(--tx);color:var(--bg)}
+/* sheet */
+.dim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;display:flex;align-items:flex-end;justify-content:center;animation:fd .2s}
+@keyframes fd{from{opacity:0}}
+.sheet{background:var(--card);width:100%;max-width:520px;border-radius:24px 24px 0 0;padding:24px 20px calc(20px + env(safe-area-inset-bottom));max-height:90%;overflow:auto;animation:sl .25s}
+@keyframes sl{from{transform:translateY(40px)}}
+.sheet h3{font-size:20px;font-weight:700;margin-bottom:18px}
+.fld{margin-bottom:14px}
+.fld label{display:block;font-size:13px;color:var(--sub);margin-bottom:6px;font-weight:600}
+.fld input,.fld textarea,.fld select{width:100%;border:0;background:var(--bg);border-radius:12px;padding:14px;outline:none;user-select:text;resize:none}
+.fld textarea{min-height:80px}
+.seg{display:flex;background:var(--bg);border-radius:12px;padding:4px}
+.seg button{flex:1;height:38px;border-radius:9px;font-weight:600;font-size:14px;color:var(--sub)}
+.seg button.on{background:var(--card);color:var(--tx);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.set{display:flex;align-items:center;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--line)}
+.set:last-child{border:0}
+.step{display:flex;align-items:center;gap:14px}
+.step button{width:34px;height:34px;border-radius:10px;background:var(--bg);font-size:18px;font-weight:600}
+.step b{min-width:28px;text-align:center}
+.toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:rgba(25,31,40,.92);color:#fff;padding:12px 18px;border-radius:12px;font-size:14px;z-index:50;animation:fd .2s;white-space:nowrap}
+.stat3{display:grid;grid-template-columns:repeat(3,1fr);text-align:center}
+.stat3 .v{font-size:24px;font-weight:700}
+.stat3 .l{font-size:12px;color:var(--sub);margin-top:2px}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--sub);margin-top:12px;flex-wrap:wrap}
+.legend span::before{content:"";display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;background:var(--c)}
+.empty{text-align:center;color:var(--sub);padding:30px 0}
+.fab{position:fixed;right:20px;bottom:calc(80px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:18px;background:var(--pri);color:#fff;font-size:28px;box-shadow:0 6px 18px rgba(49,130,246,.35);z-index:4}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="words.js"></script>
+<script>
+"use strict";
+/* ============ 저장 ============ */
+const KEY = "voca.v1";
+let S;
+function load(){
+  try { S = JSON.parse(localStorage.getItem(KEY)) } catch(e) { S = null }
+  if (!S) S = { decks: [], cards: [], settings: { newPerDay: 10, dir: "front" }, log: {} };
+  // 기본 덱·단어 병합 (기존 진도 유지)
+  for (const d of SEED_DECKS) if (!S.decks.find(x => x.id === d.id)) S.decks.push({ ...d });
+  const have = new Set(S.cards.map(c => c.id).concat(S.removed || []));
+  for (const [deck, list] of Object.entries(SEED_CARDS))
+    for (const [id, f, b, ex] of list)
+      if (!have.has(id)) S.cards.push(blank(deck, f, b, ex, id));
+  save();
+}
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)) } catch(e) {} }
+function blank(deck, f, b, ex, id){
+  return { id: id || "u" + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    deck, f, b, ex: ex || "", seen: false, ivl: 0, ease: 2.5, due: 0, reps: 0, lapses: 0, added: today() };
+}
+
+/* ============ 날짜 (새벽 4시 기준으로 하루가 바뀜) ============ */
+function today(){
+  const d = new Date(Date.now() - 4 * 3600e3);
+  return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5);
+}
+function dayLog(t = today()){ return S.log[t] || (S.log[t] = { rev: 0, nw: {} }) }
+function streak(){
+  let t = today(), n = 0;
+  if (!(S.log[t] && S.log[t].rev)) t--;
+  while (S.log[t] && S.log[t].rev) { n++; t-- }
+  return n;
+}
+
+/* ============ 망각곡선 스케줄 (SM-2 변형) ============ */
+// 결과: {ivl: 일수, again: 세션 내 다시 보여줄 위치(없으면 null)}
+function plan(c, r){
+  const i = c.ivl, e = c.ease;
+  if (r === 1) return { ivl: 0, again: 2, ease: Math.max(1.3, e - .2) };
+  if (r === 2) return i === 0 ? { ivl: 0, again: 6, ease: Math.max(1.3, e - .15) }
+                              : { ivl: Math.max(1, Math.round(i * 1.2)), ease: Math.max(1.3, e - .15) };
+  if (r === 3) { const g = i === 0 ? 1 : i === 1 ? 3 : Math.round(i * e); return { ivl: Math.max(g, i + 1), ease: e } }
+  const good = plan(c, 3).ivl, g = i === 0 ? 4 : Math.round(i * e * 1.3);
+  return { ivl: Math.max(g, good + 1), ease: e + .15 };
+}
+function fmtIvl(p){
+  if (p.ivl === 0) return p.again <= 2 ? "바로" : "잠시 후";
+  const d = p.ivl;
+  if (d < 30) return d + "일";
+  if (d < 365) return Math.round(d / 30) + "개월";
+  return (d / 365).toFixed(1) + "년";
+}
+function state(c){
+  if (!c.seen) return ["새 단어", "p-new"];
+  if (c.ivl === 0) return ["학습 중", "p-lrn"];
+  if (c.ivl < 21) return ["복습 중", "p-yng"];
+  return ["외움", "p-mat"];
+}
+function deckInfo(id){
+  const t = today(), cs = S.cards.filter(c => !id || c.deck === id);
+  const due = cs.filter(c => c.seen && c.due <= t).length;
+  let nw = 0;
+  const decks = id ? [id] : S.decks.map(d => d.id);
+  for (const d of decks){
+    const left = Math.max(0, S.settings.newPerDay - (dayLog().nw[d] || 0));
+    nw += Math.min(left, S.cards.filter(c => c.deck === d && !c.seen).length);
+  }
+  return { total: cs.length, due, nw,
+    unseen: cs.filter(c => !c.seen).length,
+    lrn: cs.filter(c => c.seen && c.ivl < 21).length,
+    mat: cs.filter(c => c.seen && c.ivl >= 21).length };
+}
+
+/* ============ 화면 ============ */
+let tab = "home", listDeck = null, query = "", study = null, sheet = null;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
+const deckOf = id => S.decks.find(d => d.id === id) || { name: "?", color: "#888" };
+
+function render(){
+  let h = "";
+  if (tab === "home") h = homeView();
+  else if (tab === "list") h = listView();
+  else if (tab === "stats") h = statsView();
+  else h = setView();
+  $("#root").innerHTML = `<div class="app">${h}</div>${tabsView()}${study ? studyView() : ""}${sheet ? sheetView() : ""}`;
+  if (sheet && sheet.focus) { const el = $(sheet.focus); if (el) el.focus(); sheet.focus = null }
+}
+
+const IC = {
+  home: '<path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/>',
+  list: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 12.5h8M8 16h5" stroke="var(--card)" stroke-width="1.8" stroke-linecap="round"/>',
+  stats: '<rect x="4" y="12" width="4" height="8" rx="1.2"/><rect x="10" y="7" width="4" height="13" rx="1.2"/><rect x="16" y="4" width="4" height="16" rx="1.2"/>',
+  set: '<path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm8.3 5.1-1.7-.4a6.9 6.9 0 0 1-.6 1.5l.9 1.5-1.7 1.7-1.5-.9c-.5.3-1 .5-1.5.6l-.4 1.7h-2.4l-.4-1.7c-.5-.1-1-.3-1.5-.6l-1.5.9-1.7-1.7.9-1.5a6.9 6.9 0 0 1-.6-1.5l-1.7-.4v-2.4l1.7-.4c.1-.5.3-1 .6-1.5l-.9-1.5 1.7-1.7 1.5.9c.5-.3 1-.5 1.5-.6l.4-1.7h2.4l.4 1.7c.5.1 1 .3 1.5.6l1.5-.9 1.7 1.7-.9 1.5c.3.5.5 1 .6 1.5l1.7.4z" fill-rule="evenodd"/>'
+};
+function tabsView(){
+  const t = [["home","홈"],["list","단어장"],["stats","통계"],["set","설정"]];
+  return `<nav class="tabs">${t.map(([k, n]) => `<button class="${tab===k?"on":""}" onclick="go('${k}')"><svg viewBox="0 0 24 24" fill="currentColor">${IC[k]}</svg>${n}</button>`).join("")}</nav>`;
+}
+function go(t){ tab = t; render(); window.scrollTo(0, 0) }
+
+function homeView(){
+  const a = deckInfo(), st = streak();
+  const doneToday = dayLog().rev;
+  return `
+  <div class="row"><h1>오늘의 단어</h1><span class="sp"></span>${st ? `<span class="streak">🔥 ${st}일 연속</span>` : ""}</div>
+  <div class="box hero">
+    <div class="nums">
+      <div><div class="lbl">복습할 단어</div><div class="big" style="color:var(--pri)">${a.due}</div></div>
+      <div><div class="lbl">새 단어</div><div class="big">${a.nw}</div></div>
+      <div><div class="lbl">오늘 공부</div><div class="big" style="color:var(--mute)">${doneToday}</div></div>
+    </div>
+    ${a.due + a.nw ? `<button class="btn" onclick="start()">전체 시작하기</button>`
+      : `<button class="btn gray" disabled>오늘 할 건 끝! 내일 또 봐요</button>`}
+  </div>
+  <h2>단어장</h2>
+  ${S.decks.map(d => { const i = deckInfo(d.id), tot = i.total || 1; return `
+    <div class="box deck" onclick="start('${d.id}')">
+      <div class="dot" style="background:${d.color}">${esc(d.name.slice(0,1))}</div>
+      <div class="sp">
+        <div class="nm">${esc(d.name)}</div>
+        <div class="cnt">${i.due || i.nw ? `복습 <b>${i.due}</b> · 새 단어 <i>${i.nw}</i>` : "오늘 완료 ✓"}</div>
+        <div class="bar"><span style="width:${i.mat/tot*100}%;background:var(--grn)"></span><span style="width:${i.lrn/tot*100}%;background:var(--pri)"></span></div>
+      </div>
+    </div>`}).join("")}
+  <button class="btn ghost" style="margin-top:4px" onclick="openSheet({t:'deck'})">+ 새 단어장 만들기</button>`;
+}
+
+/* ============ 학습 세션 ============ */
+function start(deckId){
+  const t = today();
+  const pool = S.cards.filter(c => !deckId || c.deck === deckId);
+  const rev = pool.filter(c => c.seen && c.due <= t).sort((a, b) => a.due - b.due || Math.random() - .5);
+  let nw = [];
+  for (const d of (deckId ? [deckId] : S.decks.map(x => x.id))){
+    const left = Math.max(0, S.settings.newPerDay - (dayLog().nw[d] || 0));
+    nw = nw.concat(S.cards.filter(c => c.deck === d && !c.seen).slice(0, left));
+  }
+  if (!deckId) nw.sort(() => Math.random() - .5);
+  // 복습 3개마다 새 단어 1개씩 섞기
+  const q = []; let ni = 0;
+  rev.forEach((c, i) => { q.push(c.id); if (i % 3 === 2 && ni < nw.length) q.push(nw[ni++].id) });
+  while (ni < nw.length) q.push(nw[ni++].id);
+  if (!q.length) return toast("지금은 공부할 단어가 없어요");
+  study = { deck: deckId || null, q, total: q.length, done: 0, shown: false, flip: null, again: 0 };
+  nextCard(); render();
+}
+function nextCard(){
+  if (!study.q.length) return;
+  const d = S.settings.dir;
+  study.flip = d === "back" || (d === "mix" && Math.random() < .5);
+  study.shown = false;
+}
+function studyView(){
+  const s = study;
+  if (!s.q.length) return `<div class="study">
+    <div class="stop"><span class="sp"></span></div>
+    <div class="done"><div class="em">🎉</div><div class="t">오늘 공부 끝!</div>
+    <div class="sub">${s.total}개 완료 · 다시 본 횟수 ${s.again}번</div></div>
+    <button class="btn" onclick="closeStudy()">확인</button></div>`;
+  const c = S.cards.find(x => x.id === s.q[0]);
+  const dk = deckOf(c.deck);
+  const front = s.flip ? c.b : c.f, back = s.flip ? c.f : c.b;
+  const [stName] = state(c);
+  const pct = s.done / (s.done + s.q.length) * 100;
+  return `<div class="study">
+    <div class="stop">
+      <button onclick="closeStudy()" aria-label="닫기"><svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <div class="prog"><span style="width:${pct}%"></span></div>
+      <span class="sub">${s.q.length}</span>
+    </div>
+    <div class="flash" onclick="${s.shown ? "" : "reveal()"}">
+      <span class="tag" style="background:${dk.color}22;color:${dk.color}">${esc(dk.name)}${s.flip ? " · 뜻→단어" : ""}</span>
+      <span class="state">${stName}</span>
+      <div class="q ${front.length > 28 ? "long" : ""}">${esc(front)}</div>
+      ${s.shown ? `<div class="a"><div class="m">${esc(back)}</div>${c.ex ? `<div class="ex">${esc(c.ex)}</div>` : ""}</div>`
+        : `<div class="sub" style="text-align:center">탭해서 정답 보기</div>`}
+    </div>
+    ${s.shown ? `<div class="rate">${[["다시",1],["어려움",2],["알아요",3],["쉬움",4]].map(([n, r]) =>
+      `<button class="r${r}" onclick="rate(${r})">${n}<small>${fmtIvl(plan(c, r))}</small></button>`).join("")}</div>`
+      : `<button class="btn" onclick="reveal()">정답 보기</button>`}
+  </div>`;
+}
+function reveal(){ study.shown = true; render() }
+function rate(r){
+  const s = study, c = S.cards.find(x => x.id === s.q[0]), p = plan(c, r), t = today();
+  const L = dayLog();
+  if (!c.seen){ c.seen = true; L.nw[c.deck] = (L.nw[c.deck] || 0) + 1 }
+  L.rev++;
+  c.ease = p.ease; c.reps++;
+  if (r === 1){ if (c.ivl > 0) c.lapses++; s.again++ }
+  c.ivl = p.ivl; c.due = t + p.ivl;
+  s.q.shift();
+  if (p.again != null) s.q.splice(Math.min(p.again, s.q.length), 0, c.id);
+  else s.done++;
+  save(); nextCard(); render();
+}
+function closeStudy(){ study = null; render() }
+
+/* ============ 단어장 ============ */
+function listView(){
+  const d = listDeck || S.decks[0].id;
+  listDeck = d;
+  const ql = query.trim().toLowerCase();
+  const cs = S.cards.filter(c => c.deck === d && (!ql || (c.f + c.b + c.ex).toLowerCase().includes(ql)));
+  return `<h1>단어장</h1>
+  <div class="chips">${S.decks.map(x => `<button class="chip ${x.id===d?"on":""}" onclick="listDeck='${x.id}';render()">${esc(x.name)}</button>`).join("")}</div>
+  <input class="search" placeholder="검색" value="${esc(query)}" oninput="query=this.value;renderList()">
+  <div class="row" style="margin:6px 0 10px"><span class="sub">${cs.length}개</span><span class="sp"></span>
+    <button class="sm" onclick="openSheet({t:'bulk'})">여러 개 붙여넣기</button>
+    ${S.decks.find(x=>x.id===d && !SEED_DECKS.some(s=>s.id===d)) ? `<button class="sm" style="background:var(--red-weak);color:var(--red)" onclick="delDeck('${d}')">덱 삭제</button>` : ""}
+  </div>
+  <div class="box" id="wl" style="padding:4px 20px">${wordRows(cs)}</div>
+  <button class="fab" onclick="openSheet({t:'card'})">+</button>`;
+}
+function wordRows(cs){
+  if (!cs.length) return `<div class="empty">단어가 없어요</div>`;
+  return cs.map(c => { const [n, k] = state(c); return `
+    <div class="word" onclick="openSheet({t:'card',id:'${c.id}'})">
+      <div class="sp"><div class="f">${esc(c.f)}</div><div class="b">${esc(c.b)}</div></div>
+      <span class="pill ${k}">${n}</span></div>`}).join("");
+}
+function renderList(){
+  const ql = query.trim().toLowerCase();
+  $("#wl").innerHTML = wordRows(S.cards.filter(c => c.deck === listDeck && (!ql || (c.f + c.b + c.ex).toLowerCase().includes(ql))));
+}
+function delDeck(id){
+  if (!confirmTwice("del-" + id, "한 번 더 누르면 덱과 단어가 모두 삭제돼요")) return;
+  S.decks = S.decks.filter(d => d.id !== id); S.cards = S.cards.filter(c => c.deck !== id);
+  listDeck = null; save(); render(); toast("삭제했어요");
+}
+let pend = null;
+function confirmTwice(k, msg){
+  if (pend && pend.k === k && Date.now() - pend.t < 3000){ pend = null; return true }
+  pend = { k, t: Date.now() }; toast(msg); return false;
+}
+
+/* ============ 시트 (추가/편집) ============ */
+function openSheet(o){ sheet = o; if (o.t === "card" && !o.id) o.focus = "#ff"; render() }
+function closeSheet(){ sheet = null; render() }
+function sheetView(){
+  const o = sheet; let h = "";
+  if (o.t === "card"){
+    const c = o.id ? S.cards.find(x => x.id === o.id) : { f:"", b:"", ex:"", deck: listDeck || S.decks[0].id };
+    h = `<h3>${o.id ? "단어 수정" : "단어 추가"}</h3>
+    <div class="fld"><label>단어장</label><select id="fd">${S.decks.map(d => `<option value="${d.id}" ${d.id===c.deck?"selected":""}>${esc(d.name)}</option>`).join("")}</select></div>
+    <div class="fld"><label>앞면 (단어·표현)</label><input id="ff" value="${esc(c.f)}"></div>
+    <div class="fld"><label>뒷면 (뜻)</label><textarea id="fb">${esc(c.b)}</textarea></div>
+    <div class="fld"><label>예문·메모 (선택)</label><textarea id="fe">${esc(c.ex)}</textarea></div>
+    ${o.id ? `<div class="sub" style="margin:-4px 0 14px">${state(c)[0]} · 다음 복습 ${c.seen ? (c.due <= today() ? "오늘" : (c.due - today()) + "일 뒤") : "-"} · 틀린 횟수 ${c.lapses}</div>` : ""}
+    <button class="btn" onclick="saveCard('${o.id || ""}')">${o.id ? "저장" : "추가"}</button>
+    ${o.id ? `<div class="row" style="margin-top:10px"><button class="btn gray" onclick="resetCard('${o.id}')">진도 초기화</button><button class="btn danger" onclick="delCard('${o.id}')">삭제</button></div>` : ""}`;
+  } else if (o.t === "bulk"){
+    h = `<h3>여러 개 한 번에 추가</h3>
+    <div class="sub" style="margin:-8px 0 14px;line-height:1.5">한 줄에 하나씩 <b>단어 | 뜻 | 예문</b><br>엑셀에서 열 복사해 붙여넣어도 돼요 (탭 구분)</div>
+    <div class="fld"><label>단어장</label><select id="fd">${S.decks.map(d => `<option value="${d.id}" ${d.id===listDeck?"selected":""}>${esc(d.name)}</option>`).join("")}</select></div>
+    <div class="fld"><textarea id="fbk" style="min-height:180px" placeholder="negotiate | 협상하다 | We negotiated a lower price.&#10;lead time | 납기 기간"></textarea></div>
+    <button class="btn" onclick="saveBulk()">추가하기</button>`;
+  } else if (o.t === "deck"){
+    const cols = ["#3182F6","#00B386","#F2761D","#8B5CF6","#F04452","#191F28"];
+    o.color = o.color || cols[3];
+    h = `<h3>새 단어장</h3>
+    <div class="fld"><label>이름</label><input id="dn" placeholder="예: 일본어, 컴활 용어"></div>
+    <div class="fld"><label>색</label><div class="row">${cols.map(c => `<button onclick="sheet.color='${c}';document.querySelectorAll('.cb').forEach(b=>b.style.outline='none');this.style.outline='3px solid var(--tx)'" class="cb" style="width:36px;height:36px;border-radius:11px;background:${c};${c===o.color?"outline:3px solid var(--tx)":""};outline-offset:2px"></button>`).join("")}</div></div>
+    <button class="btn" style="margin-top:8px" onclick="saveDeck()">만들기</button>`;
+  } else if (o.t === "import"){
+    h = `<h3>백업 가져오기</h3>
+    <div class="sub" style="margin:-8px 0 14px">내보내기로 저장한 내용을 붙여넣으세요. 지금 데이터는 덮어써져요.</div>
+    <div class="fld"><textarea id="imp" style="min-height:180px"></textarea></div>
+    <button class="btn" onclick="doImport($('#imp').value)">가져오기</button>`;
+  }
+  return `<div class="dim" onclick="if(event.target===this)closeSheet()"><div class="sheet">${h}</div></div>`;
+}
+function saveCard(id){
+  const f = $("#ff").value.trim(), b = $("#fb").value.trim(), ex = $("#fe").value.trim(), dk = $("#fd").value;
+  if (!f || !b) return toast("앞면과 뜻은 꼭 채워주세요");
+  if (id){ const c = S.cards.find(x => x.id === id); Object.assign(c, { f, b, ex, deck: dk }) }
+  else S.cards.push(blank(dk, f, b, ex));
+  listDeck = dk; save();
+  if (id) closeSheet(); else { sheet = { t: "card", focus: "#ff" }; render(); toast("추가했어요 · 계속 입력하세요") }
+}
+function saveBulk(){
+  const dk = $("#fd").value; let n = 0;
+  for (const line of $("#fbk").value.split("\n")){
+    const p = line.split(line.includes("\t") ? "\t" : "|").map(s => s.trim());
+    if (p[0] && p[1]){ S.cards.push(blank(dk, p[0], p[1], p.slice(2).join(" "))); n++ }
+  }
+  if (!n) return toast("형식: 단어 | 뜻 | 예문");
+  listDeck = dk; save(); closeSheet(); toast(n + "개 추가했어요");
+}
+function saveDeck(){
+  const n = $("#dn").value.trim(); if (!n) return toast("이름을 적어주세요");
+  const id = "d" + Date.now().toString(36);
+  S.decks.push({ id, name: n, sub: "", color: sheet.color });
+  listDeck = id; save(); sheet = null; tab = "list"; render();
+}
+function delCard(id){
+  if (!confirmTwice("c-" + id, "한 번 더 누르면 삭제돼요")) return;
+  S.cards = S.cards.filter(c => c.id !== id);
+  // 기본 단어를 지우면 다시 생기지 않도록 기록
+  (S.removed = S.removed || []).push(id);
+  save(); closeSheet();
+}
+function resetCard(id){
+  const c = S.cards.find(x => x.id === id);
+  Object.assign(c, { seen: false, ivl: 0, ease: 2.5, due: 0, reps: 0, lapses: 0 });
+  save(); closeSheet(); toast("새 단어로 돌렸어요");
+}
+
+/* ============ 통계 ============ */
+function statsView(){
+  const a = deckInfo(), t = today(), tot = a.total || 1;
+  // 앞으로 14일 복습 예정
+  const fc = Array.from({ length: 14 }, (_, i) => S.cards.filter(c => c.seen && (i === 0 ? c.due <= t : c.due === t + i)).length);
+  const mx = Math.max(5, ...fc);
+  const W = 320, H = 120, bw = W / 14;
+  const bars = fc.map((v, i) => { const h = v / mx * (H - 20);
+    return `<rect x="${i*bw+3}" y="${H-h}" width="${bw-6}" height="${h}" rx="3" fill="${i===0?"var(--pri)":"var(--mute)"}" opacity="${i===0?1:.55}"/>${v?`<text x="${i*bw+bw/2}" y="${H-h-5}" text-anchor="middle" font-size="10" fill="var(--sub)">${v}</text>`:""}`}).join("");
+  // 최근 14일 공부량
+  const past = Array.from({ length: 14 }, (_, i) => (S.log[t - 13 + i] || {}).rev || 0);
+  const pm = Math.max(10, ...past);
+  const pbars = past.map((v, i) => { const h = v / pm * (H - 20);
+    return `<rect x="${i*bw+3}" y="${H-h}" width="${bw-6}" height="${Math.max(h, v?2:0)}" rx="3" fill="var(--grn)" opacity="${i===13?1:.6}"/>`}).join("");
+  const totalRev = Object.values(S.log).reduce((s, l) => s + (l.rev || 0), 0);
+  return `<h1>통계</h1>
+  <div class="box stat3">
+    <div><div class="v">${streak()}</div><div class="l">연속 공부일</div></div>
+    <div><div class="v">${dayLog().rev}</div><div class="l">오늘 본 카드</div></div>
+    <div><div class="v">${totalRev}</div><div class="l">누적 복습</div></div>
+  </div>
+  <div class="box">
+    <div class="row"><b>단어 상태</b><span class="sp"></span><span class="sub">전체 ${a.total}개</span></div>
+    <div class="bar" style="height:12px;border-radius:6px;margin-top:14px"><span style="width:${a.mat/tot*100}%;background:var(--grn)"></span><span style="width:${a.lrn/tot*100}%;background:var(--pri)"></span></div>
+    <div class="legend"><span style="--c:var(--grn)">외움 ${a.mat}</span><span style="--c:var(--pri)">복습 중 ${a.lrn}</span><span style="--c:var(--line)">새 단어 ${a.unseen}</span></div>
+    <div class="sub" style="margin-top:10px">복습 간격이 21일 넘으면 '외움'으로 쳐요</div>
+  </div>
+  <div class="box">
+    <b>앞으로 14일 복습 예정</b>
+    <svg viewBox="0 0 ${W} ${H+16}" style="width:100%;margin-top:12px">${bars}
+      <text x="${bw/2}" y="${H+13}" text-anchor="middle" font-size="10" fill="var(--sub)">오늘</text>
+      <text x="${W-bw/2}" y="${H+13}" text-anchor="middle" font-size="10" fill="var(--sub)">+13일</text></svg>
+  </div>
+  <div class="box">
+    <b>최근 14일 공부량</b>
+    <svg viewBox="0 0 ${W} ${H+16}" style="width:100%;margin-top:12px">${pbars}
+      <text x="${W-bw/2}" y="${H+13}" text-anchor="middle" font-size="10" fill="var(--sub)">오늘</text></svg>
+  </div>
+  <div class="box">
+    <b>망각곡선, 이렇게 써요</b>
+    <svg viewBox="0 0 320 130" style="width:100%;margin:14px 0 6px">
+      <line x1="20" y1="110" x2="315" y2="110" stroke="var(--line)"/><line x1="20" y1="10" x2="20" y2="110" stroke="var(--line)"/>
+      <path d="M20 15 Q35 85 60 92" fill="none" stroke="var(--mute)" stroke-width="2" stroke-dasharray="4 3"/>
+      <path d="M20 15 C30 50 40 55 48 58 L48 15 C65 45 85 52 100 55 L100 15 C130 38 160 44 185 46 L185 15 C230 28 280 33 315 35" fill="none" stroke="var(--pri)" stroke-width="2.5"/>
+      ${[[48,"1일"],[100,"3일"],[185,"8일"]].map(([x,l])=>`<circle cx="${x}" cy="15" r="4" fill="var(--pri)"/><text x="${x}" y="125" text-anchor="middle" font-size="10" fill="var(--sub)">${l}</text>`).join("")}
+      <text x="64" y="104" font-size="10" fill="var(--sub)">복습 안 하면</text>
+      <text x="250" y="28" font-size="10" fill="var(--pri)">기억 유지</text>
+    </svg>
+    <div class="sub" style="line-height:1.6">복습할 때마다 잊는 속도가 느려져서, 다음 복습까지 간격이 1일 → 3일 → 8일 → 20일…처럼 늘어나요. '알아요'를 누르면 간격이 커지고, '다시'를 누르면 처음부터 다시 쌓여요.</div>
+  </div>`;
+}
+
+/* ============ 설정 ============ */
+function setView(){
+  const s = S.settings;
+  return `<h1>설정</h1>
+  <div class="box" style="padding:4px 20px">
+    <div class="set"><div><div>하루 새 단어</div><div class="sub">단어장마다 적용</div></div>
+      <div class="step"><button onclick="setNew(-5)">−</button><b>${s.newPerDay}</b><button onclick="setNew(5)">+</button></div></div>
+    <div class="set" style="display:block"><div style="margin-bottom:10px">문제 방향</div>
+      <div class="seg">${[["front","단어 → 뜻"],["back","뜻 → 단어"],["mix","섞기"]].map(([k,n]) => `<button class="${s.dir===k?"on":""}" onclick="S.settings.dir='${k}';save();render()">${n}</button>`).join("")}</div>
+      <div class="sub" style="margin-top:8px">건축기사 서술형은 '뜻 → 단어'·'섞기'로 양방향 연습 추천</div></div>
+  </div>
+  <h2>백업</h2>
+  <div class="box">
+    <div class="sub" style="margin-bottom:14px;line-height:1.5">앱을 지우면 기록도 지워져요. 가끔 내보내서 카톡 나에게 보내기·드라이브에 저장해두세요.</div>
+    <div class="row"><button class="btn ghost" onclick="doExport()">내보내기</button><button class="btn gray" onclick="importStart()">가져오기</button></div>
+  </div>
+  <h2>초기화</h2>
+  <div class="box"><button class="btn danger" onclick="resetAll()">모든 진도 초기화</button>
+    <div class="sub" style="margin-top:10px">단어는 그대로, 학습 기록만 지워요</div></div>
+  <div class="sub" style="text-align:center;margin-top:24px">VOCA ${window.Android && Android.version ? "v" + Android.version() : ""}</div>`;
+}
+function setNew(d){ S.settings.newPerDay = Math.min(100, Math.max(0, S.settings.newPerDay + d)); save(); render() }
+function resetAll(){
+  if (!confirmTwice("all", "한 번 더 누르면 모든 진도가 초기화돼요")) return;
+  for (const c of S.cards) Object.assign(c, { seen: false, ivl: 0, ease: 2.5, due: 0, reps: 0, lapses: 0 });
+  S.log = {}; save(); render(); toast("초기화했어요");
+}
+function doExport(){
+  const txt = JSON.stringify(S);
+  const name = "voca-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+  if (window.Android && Android.share) return Android.share(name, txt);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([txt], { type: "application/json" })); a.download = name; a.click();
+}
+function importStart(){
+  if (window.Android && Android.pickFile) return Android.pickFile();
+  const i = document.createElement("input"); i.type = "file"; i.accept = ".json,application/json,text/plain";
+  i.onchange = () => { const r = new FileReader(); r.onload = () => doImport(r.result); r.readAsText(i.files[0]) }; i.click();
+}
+function doImport(txt){
+  try {
+    const d = JSON.parse(txt);
+    if (!d.cards || !d.decks) throw 0;
+    S = d; save(); load(); sheet = null; render(); toast("가져왔어요 · 단어 " + S.cards.length + "개");
+  } catch(e){ toast("백업 파일 형식이 아니에요") }
+}
+window.onImportText = doImport; // 안드로이드에서 파일 고른 뒤 호출
+
+/* ============ 기타 ============ */
+let tt;
+function toast(m){
+  clearTimeout(tt); document.querySelectorAll(".toast").forEach(e => e.remove());
+  const e = document.createElement("div"); e.className = "toast"; e.textContent = m; document.body.appendChild(e);
+  tt = setTimeout(() => e.remove(), 2200);
+}
+// 안드로이드 뒤로가기: 처리했으면 true
+window.appBack = function(){
+  if (sheet){ closeSheet(); return true }
+  if (study){ closeStudy(); return true }
+  if (tab !== "home"){ go("home"); return true }
+  return false;
+};
+// 날짜 바뀌면 다시 그리기
+document.addEventListener("visibilitychange", () => { if (!document.hidden && !study) render() });
+
+load();
+render();
+</script>
+</body>
+</html>
