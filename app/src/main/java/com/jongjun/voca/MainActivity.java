@@ -7,6 +7,9 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.provider.OpenableColumns;
+import android.database.Cursor;
+import android.util.Base64;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -20,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 
 public class MainActivity extends Activity {
     private static final int PICK = 7;
+    private static final int PICK_B64 = 8;
     private WebView web;
 
     @Override
@@ -52,7 +56,23 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
-        if (req != PICK || res != RESULT_OK || data == null || data.getData() == null) return;
+        if ((req != PICK && req != PICK_B64) || res != RESULT_OK || data == null || data.getData() == null) return;
+        if (req == PICK_B64) {
+            Uri uri = data.getData(); String name = "";
+            try (Cursor c = getContentResolver().query(uri, null, null, null, null)) {
+                if (c != null && c.moveToFirst()) { int i = c.getColumnIndex(OpenableColumns.DISPLAY_NAME); if (i >= 0) name = c.getString(i); }
+            } catch (Exception ignored) {}
+            try (InputStream in = getContentResolver().openInputStream(uri)) {
+                ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                byte[] buf = new byte[8192]; int n;
+                while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+                String b64 = Base64.encodeToString(bo.toByteArray(), Base64.NO_WRAP);
+                web.evaluateJavascript("window.onImportFile(" + JSONObject.quote(name) + "," + JSONObject.quote(b64) + ")", null);
+            } catch (Exception e) {
+                Toast.makeText(this, "파일을 읽지 못했어요", Toast.LENGTH_SHORT).show();
+            }
+            return;
+        }
         try (InputStream in = getContentResolver().openInputStream(data.getData())) {
             ByteArrayOutputStream bo = new ByteArrayOutputStream();
             byte[] buf = new byte[8192]; int n;
@@ -82,6 +102,15 @@ public class MainActivity extends Activity {
                 } catch (Exception e) {
                     Toast.makeText(MainActivity.this, "저장 실패: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 }
+            });
+        }
+        // 엑셀(xlsx) 같은 바이너리 파일: base64로 넘김
+        @JavascriptInterface public void pickFileB64() {
+            runOnUiThread(() -> {
+                Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                i.addCategory(Intent.CATEGORY_OPENABLE);
+                i.setType("*/*");
+                startActivityForResult(i, PICK_B64);
             });
         }
         @JavascriptInterface public void pickFile() {
