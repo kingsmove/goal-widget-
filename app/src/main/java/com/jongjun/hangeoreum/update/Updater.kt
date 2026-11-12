@@ -21,7 +21,7 @@ data class UpdateInfo(val build: Long, val name: String, val apkUrl: String, val
  * Builds are numbered by the CI run number, which is also the versionCode.
  */
 object Updater {
-    private const val API = "https://api.github.com/repos/kingsmove/goal-widget-/releases/latest"
+    private const val API = "https://api.github.com/repos/kingsmove/goal-widget-/releases?per_page=40"
 
     fun currentBuild(ctx: Context): Long = runCatching {
         PackageInfoCompat.getLongVersionCode(ctx.packageManager.getPackageInfo(ctx.packageName, 0))
@@ -42,9 +42,20 @@ object Updater {
             }
             val body = conn.inputStream.bufferedReader().use { it.readText() }
             conn.disconnect()
-            val o = JSONObject(body)
+            // The repo also holds other apps' releases (trip-*, voca-*): only look at UFK's "build-N" tags.
+            val arr = org.json.JSONArray(body)
+            var best: JSONObject? = null
+            var bestBuild = 0L
+            for (i in 0 until arr.length()) {
+                val r = arr.getJSONObject(i)
+                val t = r.optString("tag_name")
+                if (!t.startsWith("build-") || r.optBoolean("draft") || r.optBoolean("prerelease")) continue
+                val n = t.removePrefix("build-").toLongOrNull() ?: continue
+                if (n > bestBuild) { bestBuild = n; best = r }
+            }
+            val o = best ?: return@runCatching null
             val tag = o.optString("tag_name")
-            val build = tag.substringAfterLast('-').toLongOrNull() ?: 0L
+            val build = bestBuild
             val assets = o.optJSONArray("assets")
             var url = ""
             if (assets != null) {

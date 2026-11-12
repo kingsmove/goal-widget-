@@ -33,5 +33,5 @@ jobs:
         with:
           tag_name: build-${{ github.run_number }}
           name: UFK 1.${{ github.run_number }}
-          make_latest: true
+          make_latest: false
           files: UFK-*.apk
