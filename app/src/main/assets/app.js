@@ -259,7 +259,7 @@ function planLi(p, withDate) {
     ${tag(c.n, c.c)}</div>`;
 }
 function vPlan() {
-  let h = hd('일정');
+  let h = hd('일정', `<button class="ib" data-a="xl-import" title="엑셀로 가져오기">${ico('import')}</button>`);
   if (!S.plans.length) return h + `<div class="sec">${empty('일정이 비어 있어요', '+ 버튼으로 첫 일정을 넣어보세요')}</div>` + fab('plan-add');
   const groups = {};
   [...S.plans].sort(planSort).forEach(p => (groups[p.date || ''] ||= []).push(p));
@@ -289,6 +289,77 @@ function planForm(p) {
       ui.lastPlanDate = p.date;
       upsert('plans', p); toast(isNew ? '일정을 추가했어요' : '저장했어요');
     },
+  });
+}
+
+/* ============ EXCEL IMPORT ============ */
+const KIND_ALIAS = { 식사: 'food', 밥: 'food', 음식: 'food', 숙박: 'stay', 호텔: 'stay', 교통: 'move', 버스: 'move', 근무: 'work', 업무: 'work', 비행기: 'flight', 항공권: 'flight', 구경: 'see', 카페: 'cafe' };
+function kindKey(v) {
+  v = String(v || '').trim(); if (!v) return 'etc';
+  const k = Object.keys(CATS).find(k => CATS[k].n === v || k === v.toLowerCase());
+  return k || KIND_ALIAS[v] || 'etc';
+}
+function yearGuess() { const { start } = tripRange(); return start ? +start.slice(0, 4) : new Date().getFullYear(); }
+function xlDate(v) {
+  if (v === '' || v == null) return '';
+  if (typeof v === 'number') { const d = new Date(Date.UTC(1899, 11, 30) + Math.round(v) * 864e5); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`; }
+  const t = String(v).trim();
+  let m = t.match(/(\d{4})\s*[-./년]\s*(\d{1,2})\s*[-./월]\s*(\d{1,2})/);
+  if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+  m = t.match(/(\d{1,2})\s*[-./월]\s*(\d{1,2})/);
+  if (m) return `${yearGuess()}-${pad(m[1])}-${pad(m[2])}`;
+  return '';
+}
+function xlTime(v) {
+  if (v === '' || v == null) return '';
+  if (typeof v === 'number') { const mins = Math.round((v % 1) * 1440); return `${pad(Math.floor(mins / 60) % 24)}:${pad(mins % 60)}`; }
+  const t = String(v).trim(); const pm = /오후|pm/i.test(t), am = /오전|am/i.test(t);
+  let m = t.match(/(\d{1,2})\s*[:시]\s*(\d{1,2})?/);
+  if (!m) return '';
+  let h = +m[1]; if (pm && h < 12) h += 12; if (am && h === 12) h = 0;
+  return `${pad(h % 24)}:${pad(+(m[2] || 0))}`;
+}
+async function importExcel(file) {
+  if (!window.XLSX) { toast('엑셀 기능을 불러오지 못했어요'); return; }
+  let rows;
+  try {
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const ws = wb.Sheets['일정'] || wb.Sheets[wb.SheetNames[0]];
+    rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+  } catch (e) { toast('엑셀 파일을 읽지 못했어요'); return; }
+  const norm = v => String(v).replace(/\s/g, '');
+  const hi = rows.findIndex(r => r.some(c => ['할일', '일정', '제목'].includes(norm(c))));
+  if (hi < 0) { toast('"할 일" 칸이 있는 양식이 아니에요'); return; }
+  const H = rows[hi].map(norm);
+  const col = (...names) => H.findIndex(h => names.includes(h));
+  const C = { date: col('날짜'), time: col('시간'), title: col('할일', '일정', '제목'), kind: col('종류'), place: col('장소'), memo: col('메모') };
+  let added = 0, dup = 0, newPlaces = 0, filled = 0;
+  for (const r of rows.slice(hi + 1)) {
+    const get = i => (i >= 0 ? r[i] : '');
+    const title = String(get(C.title)).trim();
+    if (!title || /\(예시\)/.test(title)) continue;
+    const p = { id: uid(), date: xlDate(get(C.date)), time: xlTime(get(C.time)), title, cat: kindKey(get(C.kind)), placeId: '', memo: String(get(C.memo)).trim(), done: false };
+    if (S.plans.some(x => x.title === p.title && (x.date || '') === p.date && (x.time || '') === p.time)) { dup++; continue; }
+    const pn = String(get(C.place)).trim();
+    if (pn) {
+      let pl = S.places.find(x => x.name.trim().toLowerCase() === pn.toLowerCase());
+      if (!pl) { pl = { id: uid(), name: pn, cat: PCATS[p.cat] ? p.cat : 'etc', status: 'want', lat: '', lng: '', address: '', memo: '', date: p.date, url: '', rating: 0 }; S.places.push(pl); newPlaces++; }
+      p.placeId = pl.id;
+    }
+    const und = p.date && S.plans.find(x => !x.date && x.title === p.title);
+    if (und) { Object.assign(und, { date: p.date, time: p.time || und.time, memo: p.memo || und.memo, placeId: p.placeId || und.placeId }); filled++; continue; }
+    S.plans.push(p); added++;
+  }
+  save(); go('plan'); if (map) drawMarkers();
+  sheet({
+    title: added ? `일정 ${added}개를 넣었어요` : filled ? `일정 ${filled}개에 날짜를 채웠어요` : '새로 넣은 일정이 없어요',
+    body: `<div class="sub" style="font-size:15px;line-height:1.7">${[
+      added && filled ? `날짜 미정이던 일정 ${filled}개에 날짜를 채웠어요` : '',
+      dup ? `이미 있는 일정 ${dup}개는 건너뛰었어요` : '',
+      newPlaces ? `새 장소 ${newPlaces}곳이 생겼어요. 장소 탭에서 위치를 넣으면 지도에 보여요` : '',
+      !added && !dup && !filled ? '"할 일" 칸이 비어 있지 않은지 확인해주세요' : '',
+    ].filter(Boolean).join('<br>') || '일정 탭에서 확인해보세요'}</div>`,
+    foot: `<button class="btn big pri" data-a="sheet-close">확인</button>`,
   });
 }
 
@@ -714,6 +785,7 @@ function settingsSheet() {
       <div class="f"><label>화면</label><div class="seg">${[['auto', '자동'], ['light', '라이트'], ['dark', '다크']].map(([k, n]) => `<button class="${st.theme === k ? 'on' : ''}" data-a="theme" data-k="${k}">${n}</button>`).join('')}</div></div>
       <div class="f"><label>데이터</label><div class="btns" style="margin-top:0"><button class="btn" data-a="export">백업 내보내기</button><button class="btn" data-a="import">백업 불러오기</button></div>
         <div class="coord">백업 파일엔 사진이 빠져요. 사진은 폰 갤러리에 원본이 남아 있어요.</div>
+        <button class="btn" style="width:100%;margin-top:10px" data-a="xl-import">${ico('import', 'i s')}엑셀로 일정 가져오기</button>
         <button class="btn red" style="width:100%;margin-top:10px" data-a="reset">전체 초기화</button></div>
       <div class="coord" style="justify-content:center;margin-top:22px">지도 © OpenStreetMap · OpenFreeMap · 장소 검색 Photon</div>`,
     mount: lay => {
@@ -974,6 +1046,7 @@ const A = {
     meMarker = new maplibregl.Marker({ element: el }).setLngLat([ln, la]).addTo(map); map.flyTo({ center: [ln, la], zoom: 15 });
   }),
   'map-imgs': () => mapImgsSheet(),
+  'xl-import': () => { const i = $('#xlIn'); i.value = ''; i.click(); },
   'mapimg-add': () => pickFiles({ kind: 'map' }),
   'mapimg-open': el => { const ids = S.maps.map(m => m.id); openViewer(ids, ids.indexOf(el.dataset.id), 'map'); },
   mview: el => { ui.moneyView = el.dataset.k; render(); },
@@ -1043,6 +1116,7 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('input', e => { if (e.target.id === 'tipBill') tipCalc(); });
 $('#fileIn').addEventListener('change', e => onFiles(e.target.files));
+$('#xlIn').addEventListener('change', e => { const f = e.target.files[0]; if (f) importExcel(f); });
 $('#mq').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); mapSearch(); } });
 $('#mq').addEventListener('input', e => { $('#mqx').style.display = e.target.value ? '' : 'none'; if (!e.target.value) $('#mres').style.display = 'none'; });
 $('#mqx').addEventListener('click', () => { $('#mq').value = ''; $('#mqx').style.display = 'none'; $('#mres').style.display = 'none'; hideMcard(); });

@@ -118,10 +118,19 @@ public class MainActivity extends Activity {
                 fileCb = cb;
                 Intent i = new Intent(Intent.ACTION_GET_CONTENT);
                 i.addCategory(Intent.CATEGORY_OPENABLE);
-                i.setType("image/*");
+                String acc = String.join(",", p.getAcceptTypes());
+                if (acc.contains("image")) {
+                    i.setType("image/*");
+                } else {
+                    i.setType("*/*");
+                    i.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            "application/vnd.ms-excel", "text/csv", "text/comma-separated-values",
+                            "application/octet-stream"});
+                }
                 if (p.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE) i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
                 try {
-                    startActivityForResult(Intent.createChooser(i, "사진 선택"), REQ_FILES);
+                    startActivityForResult(Intent.createChooser(i, acc.contains("image") ? "사진 선택" : "엑셀 파일 선택"), REQ_FILES);
                 } catch (Exception e) {
                     fileCb = null;
                     return false;
