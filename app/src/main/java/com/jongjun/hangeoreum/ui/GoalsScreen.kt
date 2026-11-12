@@ -41,9 +41,9 @@ import com.jongjun.hangeoreum.data.studyMsForGoal
 
 @Composable
 fun GoalsScreen(data: AppData, now: Long, nav: Nav) {
-    var levelIdx by rememberSaveable { mutableStateOf(1) }
+    var levelIdx by rememberSaveable { mutableStateOf(2) }
     var showPast by rememberSaveable { mutableStateOf(false) }
-    val level = Level.entries[levelIdx]
+    val level = Level.ordered[levelIdx.coerceIn(0, Level.ordered.lastIndex)]
     val today = Dates.today()
     val all = data.goals.filter { it.level == level }
     val current = all.filter { it.endDay >= today && !(it.done && it.endDay < today) }
@@ -69,7 +69,7 @@ fun GoalsScreen(data: AppData, now: Long, nav: Nav) {
             }
         }
         item {
-            Segmented(Level.entries.map { it.label }, levelIdx) { levelIdx = it }
+            Segmented(Level.ordered.map { it.label }, levelIdx) { levelIdx = it }
         }
         item {
             T(hint(level), 13, Modifier.padding(start = 4.dp, top = 2.dp), color = pal.sub)
@@ -103,6 +103,7 @@ private fun hint(level: Level) = when (level) {
     Level.MONTH -> "몇 월까지 끝낼지 정하는 목표 · 자격증, 프로젝트"
     Level.WEEK -> "이번 주에 끝낼 단위"
     Level.DAY -> "오늘은 어디까지 할지"
+    Level.PLAN -> "특정 날까지 끝낼 일 · 시작일과 마감일을 직접 정해요"
 }
 
 @Composable

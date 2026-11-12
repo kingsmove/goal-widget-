@@ -192,7 +192,7 @@ private fun GoalPickerSheet(data: AppData, selected: String?, onDismiss: () -> U
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val today = Dates.today()
     val candidates = data.goals.filter { !it.done && it.endDay >= today }
-        .sortedWith(compareBy<com.jongjun.hangeoreum.data.Goal>({ it.level.ordinal }, { it.endDay }))
+        .sortedWith(compareBy<com.jongjun.hangeoreum.data.Goal>({ it.level.rank }, { it.endDay }))
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state, containerColor = pal.card) {
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)
@@ -200,7 +200,7 @@ private fun GoalPickerSheet(data: AppData, selected: String?, onDismiss: () -> U
         ) {
             T("어떤 목표를 공부하나요?", 22, Modifier.padding(bottom = 12.dp), weight = FontWeight.Bold)
             PickRow("목표 선택 안 함", null, selected == null) { onPick(null) }
-            Level.entries.forEach { lv ->
+            Level.ordered.forEach { lv ->
                 val list = candidates.filter { it.level == lv }
                 if (list.isNotEmpty()) {
                     T(lv.label, 13, Modifier.padding(top = 16.dp, bottom = 4.dp), weight = FontWeight.SemiBold, color = pal.sub)

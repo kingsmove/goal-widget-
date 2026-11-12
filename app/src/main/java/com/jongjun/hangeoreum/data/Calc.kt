@@ -40,7 +40,7 @@ fun AppData.todayProgress(today: Long = Dates.today()): Float {
 /** Goals of upper levels that are still running. */
 fun AppData.activeGoals(today: Long = Dates.today()): List<Goal> =
     goals.filter { it.level != Level.DAY && !it.done && it.endDay >= today }
-        .sortedWith(compareBy<Goal> { it.level.ordinal }.thenBy { it.endDay })
+        .sortedWith(compareBy<Goal> { it.level.rank }.thenBy { it.endDay })
 
 fun AppData.studyMsForGoal(id: String, now: Long): Long {
     val ids = descendantIds(id) + id

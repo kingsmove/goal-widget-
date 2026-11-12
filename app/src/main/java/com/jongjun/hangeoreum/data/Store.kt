@@ -380,7 +380,7 @@ object Store {
             bgDark = tj.optC("bgDark"), cardDark = tj.optC("cardDark"), textDark = tj.optC("textDark"),
             itemColors = tj.optJSONArray("items").colors(12),
             yearColors = tj.optJSONArray("years").colors(5),
-            levelColors = tj.optJSONArray("levels").colors(4),
+            levelColors = tj.optJSONArray("levels").colors(5),
         )
         val routines = root.optJSONArray("routines")?.let { arr ->
             (0 until arr.length()).map { i ->

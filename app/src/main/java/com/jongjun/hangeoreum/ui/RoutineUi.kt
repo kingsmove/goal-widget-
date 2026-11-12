@@ -77,7 +77,7 @@ fun RoutineEditorSheet(existing: Routine?, data: AppData, onDismiss: () -> Unit)
     var parentId by remember { mutableStateOf(existing?.parentId) }
     val today = Dates.today()
     val parents = data.goals.filter { it.level != Level.DAY && !it.done && it.endDay >= today }
-        .sortedWith(compareBy<com.jongjun.hangeoreum.data.Goal>({ it.level.ordinal }, { it.endDay }))
+        .sortedWith(compareBy<com.jongjun.hangeoreum.data.Goal>({ it.level.rank }, { it.endDay }))
 
     fun close() {
         scope.launch { state.hide() }.invokeOnCompletion { onDismiss() }

@@ -52,7 +52,7 @@ data class Palette(
     val green: Color,
     val itemColors: List<Color> = DefaultItemColors,
     val yearColors: List<Color> = DefaultYearColors,
-    val levelColors: List<Color> = List(4) { blue },
+    val levelColors: List<Color> = List(5) { blue },
 )
 
 val LightPalette = Palette(
@@ -113,7 +113,7 @@ fun buildPalette(dark: Boolean, t: ThemePrefs): Palette {
         blueSoft = if (t.accent != null || derive) accent.copy(alpha = if (dark) 0.20f else 0.11f).compositeOver(card) else base.blueSoft,
         itemColors = DefaultItemColors.mapIndexed { i, c -> t.itemColors.getOrNull(i)?.let { Color(it) } ?: c },
         yearColors = DefaultYearColors.mapIndexed { i, c -> t.yearColors.getOrNull(i)?.let { Color(it) } ?: c },
-        levelColors = List(4) { i -> t.levelColors.getOrNull(i)?.let { Color(it) } ?: accent },
+        levelColors = List(5) { i -> t.levelColors.getOrNull(i)?.let { Color(it) } ?: accent },
     )
 }
 
@@ -129,7 +129,7 @@ fun itemColor(i: Int): Color {
 fun goalColor(g: Goal): Color = when {
     g.customColor != null -> Color(g.customColor)
     g.color >= 0 -> itemColor(g.color)
-    else -> LocalPalette.current.levelColors[g.level.ordinal]
+    else -> LocalPalette.current.levelColors.getOrElse(g.level.ordinal) { LocalPalette.current.blue }
 }
 
 val Pretendard = FontFamily(

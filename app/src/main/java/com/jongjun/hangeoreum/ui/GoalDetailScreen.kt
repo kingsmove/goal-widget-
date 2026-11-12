@@ -189,4 +189,5 @@ private fun childHint(level: com.jongjun.hangeoreum.data.Level) = when (level) {
     com.jongjun.hangeoreum.data.Level.MONTH -> "주간·일간 목표로 나눠보세요 · 오늘은 어디까지"
     com.jongjun.hangeoreum.data.Level.WEEK -> "하루 단위로 나눠보세요 · 오늘은 어디까지"
     com.jongjun.hangeoreum.data.Level.DAY -> ""
+    com.jongjun.hangeoreum.data.Level.PLAN -> "하루 단위 할 일로 나눠보세요"
 }

@@ -53,6 +53,7 @@ object Dates {
             Level.MONTH -> if (e.year == LocalDate.now().year) "${e.monthValue}월까지" else "${e.year}년 ${e.monthValue}월까지"
             Level.WEEK -> "${md(s)} ~ ${md(e)}"
             Level.DAY -> full(end)
+            Level.PLAN -> if (start == end) "${full(end)}까지" else "${span(start, end)}"
         }
     }
 
@@ -75,6 +76,7 @@ object Dates {
                 mon.toEpochDay() to mon.plusDays(6).toEpochDay()
             }
             Level.DAY -> anchor.toEpochDay() to anchor.toEpochDay()
+            Level.PLAN -> minOf(today, anchor).toEpochDay() to anchor.toEpochDay()
         }
     }
 
@@ -82,7 +84,7 @@ object Dates {
         Level.YEAR -> anchor.plusYears(dir.toLong())
         Level.MONTH -> anchor.plusMonths(dir.toLong())
         Level.WEEK -> anchor.plusWeeks(dir.toLong())
-        Level.DAY -> anchor.plusDays(dir.toLong())
+        Level.DAY, Level.PLAN -> anchor.plusDays(dir.toLong())
     }
 
     fun anchorLabel(level: Level, anchor: LocalDate): String {
@@ -92,6 +94,7 @@ object Dates {
             Level.MONTH -> "${anchor.year}년 ${anchor.monthValue}월까지"
             Level.WEEK -> "${md(date(s))} ~ ${md(date(e))}"
             Level.DAY -> full(e)
+            Level.PLAN -> "${full(e)}까지"
         }
     }
 

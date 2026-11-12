@@ -1,12 +1,27 @@
 package com.jongjun.hangeoreum.data
 
-enum class Level(val label: String) {
-    YEAR("연간"),
-    MONTH("월간"),
-    WEEK("주간"),
-    DAY("일간");
+/**
+ * Goal kinds. PLAN = "something to finish by a chosen date" with a free start/end date.
+ * [rank] is the nesting order (bigger = finer); enum order is kept for saved data.
+ */
+enum class Level(val label: String, val rank: Int) {
+    YEAR("연간", 0),
+    MONTH("월간", 1),
+    WEEK("주간", 3),
+    DAY("일간", 4),
+    PLAN("계획", 2);
 
-    fun child(): Level? = entries.getOrNull(ordinal + 1)
+    fun child(): Level? = when (this) {
+        YEAR -> MONTH
+        MONTH -> WEEK
+        PLAN -> DAY
+        WEEK -> DAY
+        DAY -> null
+    }
+
+    companion object {
+        val ordered: List<Level> get() = entries.sortedBy { it.rank }
+    }
 }
 
 data class Goal(
@@ -131,7 +146,7 @@ data class ThemePrefs(
     val textDark: Int? = null,
     val itemColors: List<Int?> = List(12) { null },
     val yearColors: List<Int?> = List(5) { null },
-    val levelColors: List<Int?> = List(4) { null },
+    val levelColors: List<Int?> = List(5) { null },
 )
 
 data class AppData(

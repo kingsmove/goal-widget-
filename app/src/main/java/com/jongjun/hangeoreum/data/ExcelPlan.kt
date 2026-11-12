@@ -69,6 +69,7 @@ object ExcelPlanner {
     }
 
     fun level(text: String?): Level? = when (text?.trim()?.take(1)) {
+        "계", "기", "마" -> Level.PLAN
         "연" -> Level.YEAR
         "월" -> Level.MONTH
         "주" -> Level.WEEK
@@ -148,7 +149,7 @@ object ExcelPlanner {
                 if (title.isEmpty() || isExample(title)) return@forEachIndexed
                 val lv = level(t.text(row, "레벨"))
                 val end = date(t.cell(row, "기한"))
-                if (lv == null) { warnings += "목표 ${i + 2}행 '$title': 레벨(연간/월간/주간/일간)이 필요해요"; return@forEachIndexed }
+                if (lv == null) { warnings += "목표 ${i + 2}행 '$title': 레벨(계획/연간/월간/주간/일간)이 필요해요"; return@forEachIndexed }
                 if (end == null) { warnings += "목표 ${i + 2}행 '$title': 기한을 못 읽었어요"; return@forEachIndexed }
                 gRows += GRow(title, lv, end, t.text(row, "상위"), row, i + 2)
             }
@@ -163,7 +164,7 @@ object ExcelPlanner {
             val startDay = when (r.level) {
                 Level.DAY -> endDay
                 Level.WEEK -> r.end.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toEpochDay()
-                else -> minOf(today, endDay)
+                else -> date(t.cell(r.row, "시작"))?.toEpochDay()?.takeIf { it <= endDay } ?: minOf(today, endDay)
             }
             val parentId = r.parent.takeIf { it.isNotEmpty() }?.let { p ->
                 goalIds[p] ?: existing.goals.firstOrNull { it.title == p && it.source != SOURCE }?.id

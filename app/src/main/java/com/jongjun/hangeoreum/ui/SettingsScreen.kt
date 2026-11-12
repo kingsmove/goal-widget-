@@ -125,12 +125,12 @@ fun SettingsScreen(data: AppData, onBack: () -> Unit, update: UpdateInfo?, onUpd
             item {
                 CardBox {
                     SectionTitle("목표 레벨 색")
-                    Level.entries.forEach { lv ->
+                    Level.ordered.forEach { lv ->
                         val i = lv.ordinal
                         val isDef = t.levelColors.getOrNull(i) == null
-                        ColorRow("${lv.label} 목표", p.levelColors[i], isDef) {
-                            target = PickTarget("${lv.label} 목표 색", p.levelColors[i], isDef) { th, c ->
-                                th.copy(levelColors = th.levelColors.toMutableList().also { l -> while (l.size < 4) l.add(null); l[i] = c })
+                        ColorRow("${lv.label} 목표", p.levelColors.getOrElse(i) { p.blue }, isDef) {
+                            target = PickTarget("${lv.label} 목표 색", p.levelColors.getOrElse(i) { p.blue }, isDef) { th, c ->
+                                th.copy(levelColors = th.levelColors.toMutableList().also { l -> while (l.size < 5) l.add(null); l[i] = c })
                             }
                         }
                     }

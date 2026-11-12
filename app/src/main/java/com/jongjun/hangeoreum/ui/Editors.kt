@@ -66,7 +66,7 @@ fun GoalEditorSheet(req: GoalEditReq, data: AppData, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     val existing = req.existing
     val parent = data.goal(req.parentId)
-    val levels = if (parent != null) Level.entries.filter { it.ordinal > parent.level.ordinal } else Level.entries.toList()
+    val levels = if (parent != null) Level.ordered.filter { it.rank > parent.level.rank } else Level.ordered
 
     var title by remember { mutableStateOf(existing?.title ?: "") }
     var memo by remember { mutableStateOf(existing?.memo ?: "") }
@@ -79,6 +79,10 @@ fun GoalEditorSheet(req: GoalEditReq, data: AppData, onDismiss: () -> Unit) {
     var anchor by remember {
         mutableStateOf(existing?.let { Dates.date(it.endDay) } ?: LocalDate.now())
     }
+    // free dates for PLAN goals
+    var planStart by remember { mutableLongStateOf(existing?.startDay ?: Dates.today()) }
+    var planEnd by remember { mutableLongStateOf(existing?.endDay ?: (Dates.today() + 30)) }
+    var pickPlan by remember { mutableIntStateOf(0) } // 1 start, 2 end
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         if (existing == null) {
@@ -113,9 +117,30 @@ fun GoalEditorSheet(req: GoalEditReq, data: AppData, onDismiss: () -> Unit) {
                     Level.MONTH -> "몇 월까지"
                     Level.WEEK -> "주"
                     Level.DAY -> "날짜"
+                    Level.PLAN -> "기간"
                 }
             )
-            Stepper(
+            if (level == Level.PLAN) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        T("시작", 12, color = pal.sub)
+                        ChoiceChip(Dates.full(planStart), true) { pickPlan = 1 }
+                    }
+                    Column(Modifier.weight(1f)) {
+                        T("마감", 12, color = pal.sub)
+                        ChoiceChip(Dates.full(planEnd), true) { pickPlan = 2 }
+                    }
+                }
+                T(
+                    "${planEnd - planStart + 1}일 · 마감 ${Dates.dday(planEnd)}", 13,
+                    Modifier.padding(top = 8.dp), weight = FontWeight.SemiBold, color = pal.blue,
+                )
+                Row(Modifier.padding(top = 10.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(7L to "1주", 14L to "2주", 30L to "한 달", 90L to "3개월").forEach { (n, label) ->
+                        ChoiceChip("+$label", false) { planEnd = planStart + n - 1 }
+                    }
+                }
+            } else Stepper(
                 Dates.anchorLabel(level, anchor),
                 onPrev = { anchor = Dates.stepAnchor(level, anchor, -1) },
                 onNext = { anchor = Dates.stepAnchor(level, anchor, 1) },
@@ -158,12 +183,12 @@ fun GoalEditorSheet(req: GoalEditReq, data: AppData, onDismiss: () -> Unit) {
 
             VGap(28.dp)
             PrimaryButton(if (existing == null) "추가하기" else "저장하기", Modifier.fillMaxWidth(), enabled = title.isNotBlank() && (!numeric || (targetText.toIntOrNull() ?: 0) > 0)) {
-                val (s, e) = Dates.range(level, anchor)
+                val (s, e) = if (level == Level.PLAN) planStart to maxOf(planStart, planEnd) else Dates.range(level, anchor)
                 val goal = if (existing != null) {
                     existing.copy(
                         title = title.trim(), memo = memo.trim(), level = level, endDay = e, color = gColor, customColor = gCustom,
                         target = if (numeric) targetText.toIntOrNull() ?: 0 else 0, unit = if (numeric) unit.trim() else "",
-                        startDay = if (existing.startDay <= e && existing.level == level &&
+                        startDay = if (level != Level.PLAN && existing.startDay <= e && existing.level == level &&
                             (level == Level.YEAR || level == Level.MONTH)) existing.startDay else s,
                     )
                 } else Goal(
@@ -179,6 +204,26 @@ fun GoalEditorSheet(req: GoalEditReq, data: AppData, onDismiss: () -> Unit) {
             }
         }
     }
+
+    if (pickPlan != 0) {
+        val initial = if (pickPlan == 1) planStart else planEnd
+        val dp = rememberDatePickerState(
+            initialSelectedDateMillis = LocalDate.ofEpochDay(initial).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { pickPlan = 0 },
+            confirmButton = {
+                TextButton(onClick = {
+                    dp.selectedDateMillis?.let {
+                        val d = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
+                        if (pickPlan == 1) { planStart = d; if (planEnd < d) planEnd = d } else planEnd = maxOf(d, planStart)
+                    }
+                    pickPlan = 0
+                }) { T("확인", 16, weight = FontWeight.SemiBold, color = pal.blue) }
+            },
+            dismissButton = { TextButton(onClick = { pickPlan = 0 }) { T("취소", 16, color = pal.sub) } },
+        ) { DatePicker(state = dp, showModeToggle = false) }
+    }
 }
 
 private fun placeholder(level: Level) = when (level) {
@@ -186,6 +231,7 @@ private fun placeholder(level: Level) = when (level) {
     Level.MONTH -> "예: 자격증 실기 합격"
     Level.WEEK -> "예: 시공 파트 1회독"
     Level.DAY -> "예: 기출 2023년 1회 풀기"
+    Level.PLAN -> "예: 포트폴리오 완성"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

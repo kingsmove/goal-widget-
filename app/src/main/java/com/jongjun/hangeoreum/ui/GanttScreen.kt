@@ -91,6 +91,7 @@ fun GanttScreen(data: AppData, nav: Nav, onBack: (() -> Unit)?) {
     var monthW by rememberSaveable { mutableFloatStateOf(64f) }
     var landscape by rememberSaveable { mutableStateOf(false) }
     var showEvents by rememberSaveable { mutableStateOf(true) }
+    var showLong by rememberSaveable { mutableStateOf(false) }
     val today = Dates.today()
     val nowDate = LocalDate.now()
 
@@ -104,7 +105,11 @@ fun GanttScreen(data: AppData, nav: Nav, onBack: (() -> Unit)?) {
     }
 
     // ---- rows: goals in tree order (year → its months → its weeks), then plan events
-    val levels = buildSet { add(Level.YEAR); add(Level.MONTH); if (showWeek) add(Level.WEEK) }
+    val levels = buildSet {
+        add(Level.PLAN)
+        if (showLong) { add(Level.YEAR); add(Level.MONTH) }
+        if (showWeek) add(Level.WEEK)
+    }
     val shown = data.goals.filter { it.level in levels && (showDone || !it.done) }
     val shownIds = shown.map { it.id }.toSet()
     val rows = mutableListOf<GRow>()
@@ -123,7 +128,7 @@ fun GanttScreen(data: AppData, nav: Nav, onBack: (() -> Unit)?) {
             .forEach { if (depth < 4) addTree(it, depth + 1) }
     }
     shown.filter { it.parentId == null || it.parentId !in shownIds }
-        .sortedWith(compareBy<Goal>({ it.level.ordinal }, { it.startDay }, { it.endDay }))
+        .sortedWith(compareBy<Goal>({ it.level.rank }, { it.startDay }, { it.endDay }))
         .forEach { addTree(it, 0) }
     if (showEvents) {
         data.events.filter { it.onPlan && (showDone || it.endDay >= today) }.sortedWith(compareBy<com.jongjun.hangeoreum.data.Event>({ it.day }, { it.endDay })).forEach { e ->
@@ -166,7 +171,7 @@ fun GanttScreen(data: AppData, nav: Nav, onBack: (() -> Unit)?) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconCircle(Icons.AutoMirrored.Filled.ArrowBack, onBack, bg = pal.bg)
                 T("공정표", 18, Modifier.padding(start = 6.dp).weight(1f), weight = FontWeight.Bold)
-                IconCircle(Icons.Filled.Add, { nav.editGoal(GoalEditReq(null, Level.MONTH, null)) }, tint = pal.blue, bg = pal.card)
+                IconCircle(Icons.Filled.Add, { nav.editGoal(GoalEditReq(null, Level.PLAN, null)) }, tint = pal.blue, bg = pal.card)
             }
         }
         Row(
@@ -176,7 +181,9 @@ fun GanttScreen(data: AppData, nav: Nav, onBack: (() -> Unit)?) {
         ) {
             if (embedded) ChoiceChip("크게 보기", false) { nav.openGantt() }
             else ChoiceChip(if (landscape) "세로로" else "가로로 보기", landscape) { landscape = !landscape }
+            ChoiceChip("+ 계획", false) { nav.editGoal(GoalEditReq(null, Level.PLAN, null)) }
             ChoiceChip("플랜 일정", showEvents) { showEvents = !showEvents }
+            ChoiceChip("연간·월간", showLong) { showLong = !showLong }
             ChoiceChip("주간 목표", showWeek) { showWeek = !showWeek }
             ChoiceChip("지난·완료", showDone) { showDone = !showDone }
             ChoiceChip("−", false) { monthW = (monthW - 14f).coerceAtLeast(30f) }
@@ -273,7 +280,7 @@ fun GanttScreen(data: AppData, nav: Nav, onBack: (() -> Unit)?) {
 
                         if (rows.isEmpty()) {
                             T(
-                                "연간·월간 목표나 플랜 일정을 추가하면 여기에 막대로 나와요", 13,
+                                "‘+ 계획’으로 언제까지 끝낼 일을 추가하면 여기에 막대로 나와요", 13,
                                 Modifier.offset(x = mw * pos(today) + 12.dp, y = 18.dp), color = pal.sub,
                             )
                         }
