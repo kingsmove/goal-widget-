@@ -1,4 +1,4 @@
-name: Build 건안기 APK
+name: Build RTL APK
 on:
   push:
     branches: [ vocab-app ]
@@ -15,12 +15,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: "8.11.1" }
       - run: gradle assembleRelease --stacktrace
-      - run: cp app/build/outputs/apk/release/app-release.apk GEONANGI-${{ github.run_number }}.apk
+      - run: cp app/build/outputs/apk/release/app-release.apk RTL-${{ github.run_number }}.apk
       - uses: actions/upload-artifact@v4
-        with: { name: geonangi-apk, path: GEONANGI-*.apk }
+        with: { name: rtl-apk, path: RTL-*.apk }
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: voca-${{ github.run_number }}
-          name: 건안기 1.${{ github.run_number }}
+          name: RTL 1.${{ github.run_number }}
           make_latest: false
-          files: GEONANGI-*.apk
+          files: RTL-*.apk
