@@ -332,13 +332,15 @@ async function importExcel(file) {
   if (hi < 0) { toast('"할 일" 칸이 있는 양식이 아니에요'); return; }
   const H = rows[hi].map(norm);
   const col = (...names) => H.findIndex(h => names.includes(h));
-  const C = { date: col('날짜'), time: col('시간'), title: col('할일', '일정', '제목'), kind: col('종류'), place: col('장소'), memo: col('메모') };
+  const C = { date: col('날짜'), time: col('시간', '시작', '시작시간'), end: col('끝', '종료', '끝시간', '종료시간'), title: col('할일', '일정', '제목'), kind: col('종류'), place: col('장소'), memo: col('메모'), cost: col('비용'), cur: col('통화') };
   let added = 0, dup = 0, newPlaces = 0, filled = 0;
   for (const r of rows.slice(hi + 1)) {
     const get = i => (i >= 0 ? r[i] : '');
     const title = String(get(C.title)).trim();
     if (!title || /\(예시\)/.test(title)) continue;
-    const p = { id: uid(), date: xlDate(get(C.date)), time: xlTime(get(C.time)), title, cat: kindKey(get(C.kind)), placeId: '', memo: String(get(C.memo)).trim(), done: false };
+    const end = xlTime(get(C.end)), cost = num(get(C.cost)), cur = ['USD', 'CAD', 'KRW'].includes(String(get(C.cur)).trim()) ? String(get(C.cur)).trim() : 'USD';
+    const memo = [end ? '~' + end : '', cost ? fmtCur(cost, cur) : '', String(get(C.memo)).trim()].filter(Boolean).join(' · ');
+    const p = { id: uid(), date: xlDate(get(C.date)), time: xlTime(get(C.time)), title, cat: kindKey(get(C.kind)), placeId: '', memo, done: false };
     if (S.plans.some(x => x.title === p.title && (x.date || '') === p.date && (x.time || '') === p.time)) { dup++; continue; }
     const pn = String(get(C.place)).trim();
     if (pn) {
