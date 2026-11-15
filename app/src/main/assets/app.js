@@ -42,12 +42,18 @@ const CATS = {
   stay: { n: '숙소', c: '#7B61FF', i: 'bed' },
   see: { n: '관광', c: '#00B386', i: 'star' },
   shop: { n: '쇼핑', c: '#FF4FA3', i: 'bag' },
-  move: { n: '이동', c: '#3182F6', i: 'bus' },
+  move: { n: '교통', c: '#3182F6', i: 'bus' },
+  airport: { n: '공항', c: '#5B6BFF', i: 'plane' },
   work: { n: '일', c: '#F5A623', i: 'work' },
   etc: { n: '기타', c: '#8B95A1', i: 'dots' },
 };
 const PCATS = Object.fromEntries(Object.entries(CATS).filter(([k]) => k !== 'flight'));
+const PLCATS = Object.fromEntries(Object.entries(CATS).filter(([k]) => k !== 'airport'));
+const MODES = { flight: { n: '비행기', i: 'plane' }, bus: { n: '버스', i: 'bus' }, train: { n: '기차', i: 'bus' }, car: { n: '렌터카', i: 'car' }, taxi: { n: '우버·택시', i: 'car' }, metro: { n: '지하철', i: 'bus' }, ferry: { n: '배', i: 'bus' }, walk: { n: '도보', i: 'nav' } };
+const isTrip = p => p && (p.cat === 'move' || p.cat === 'flight') && p.mv && (p.mv.from || p.mv.to);
 const ECATS = { flight: '항공권', food: '식비', cafe: '카페·간식', move: '교통', stay: '숙소', see: '관광', shop: '쇼핑', etc: '기타' };
+const PSTATUS = () => ({ none: { n: '상태 없음', c: '#8B95A1' }, ...STATUS });
+const stOf = p => STATUS[p.status] || null;
 const STATUS = {
   want: { n: '가고 싶음', c: '#3182F6' },
   booked: { n: '예약함', c: '#7B61FF' },
@@ -74,7 +80,7 @@ const MODS = {
 const TZS = {
   'Asia/Seoul': { n: '한국', s: 'KST' },
   'Pacific/Honolulu': { n: '호놀룰루', s: 'HST' },
-  'America/Los_Angeles': { n: 'LA·베가스', s: 'PT' },
+  'America/Los_Angeles': { n: 'LA·SF·베가스', s: 'PT' },
   'America/Vancouver': { n: '밴쿠버', s: 'PT' },
   'America/Edmonton': { n: '옐로나이프', s: 'MT' },
   'America/Chicago': { n: '시카고', s: 'CT' },
@@ -113,7 +119,7 @@ function tzFromText(v) {
   if (TZS[t]) return t;
   const rules = [[/한국|서울|KST|인천/i, 'Asia/Seoul'], [/로마|이탈리아|밀라노/i, 'Europe/Rome'], [/마드리드|스페인|바르셀로나/i, 'Europe/Madrid'], [/파리|프랑스/i, 'Europe/Paris'], [/런던|영국|GMT/i, 'Europe/London'],
     [/이스탄불|튀르키예|터키|TRT/i, 'Europe/Istanbul'], [/베이징|상하이|중국|북경/i, 'Asia/Shanghai'], [/도쿄|일본|오사카|JST/i, 'Asia/Tokyo'], [/호놀|하와이|HST/i, 'Pacific/Honolulu'], [/밴쿠버/i, 'America/Vancouver'], [/옐로|에드먼턴|캘거리|MT|덴버/i, 'America/Edmonton'],
-    [/시카고|CT/i, 'America/Chicago'], [/토론토/i, 'America/Toronto'], [/뉴욕|ET/i, 'America/New_York'], [/LA|로스|베가스|라스|PT|태평양|샌프/i, 'America/Los_Angeles']];
+    [/시카고|CT/i, 'America/Chicago'], [/토론토/i, 'America/Toronto'], [/뉴욕|ET/i, 'America/New_York'], [/LA|로스|베가스|라스|PT|태평양|샌프|SF|SFO/i, 'America/Los_Angeles']];
   for (const [re, z] of rules) if (re.test(t)) return z;
   return '';
 }
@@ -125,7 +131,7 @@ function seed() {
   const lvcc = uid(), union = uid();
   return {
     v: 1,
-    settings: { title: '미국 여행', route: 'LA · 라스베이거스 · 캐나다', start: '', end: '', rates: { USD: 1340, CAD: 970 }, curs: ['USD', 'CAD'], customCur: {}, ratesAt: '', budget: 0, theme: 'auto', cur: 'USD', tz: 'America/Los_Angeles', showRoute: true },
+    settings: { title: '미국 여행', route: 'SF · LA · 라스베이거스 · 뉴욕 · 로마 · 상하이', start: '', end: '', rates: { USD: 1340, CAD: 970 }, curs: ['USD', 'CAD', 'EUR', 'CNY'], customCur: {}, ratesAt: '', budget: 0, theme: 'auto', cur: 'USD', tz: 'America/Los_Angeles', showRoute: true },
     modules: ['plan', 'map', 'place', 'money', 'photo', 'book'].map(k => ({ k, on: true })),
     places: [
       { id: union, name: 'LA 유니언역 (플릭스버스)', cat: 'move', status: 'want', lat: 34.0562, lng: -118.2365, address: '800 N Alameda St, Los Angeles, CA', memo: '라스베이거스행 플릭스버스 출발지', date: '', url: '', rating: 0 },
@@ -146,6 +152,11 @@ function load() {
   S.settings = Object.assign({}, d.settings, S.settings);
   S.settings.rates = Object.assign({}, d.settings.rates, S.settings.rates);
   if (!Array.isArray(S.settings.curs)) S.settings.curs = ['USD', 'CAD'];
+  if (!S.settings.m2) { // route & currencies for SF·LA·Vegas·NYC·Rome·Shanghai
+    if (S.settings.route === 'LA · 라스베이거스 · 캐나다') S.settings.route = d.settings.route;
+    for (const c of ['EUR', 'CNY']) if (!S.settings.curs.includes(c)) S.settings.curs.push(c);
+    S.settings.m2 = true;
+  }
   for (const k of ['places', 'plans', 'bookings', 'expenses', 'photos', 'budget', 'maps']) if (!Array.isArray(S[k])) S[k] = [];
   if (!Array.isArray(S.modules)) S.modules = d.modules;
   for (const k of Object.keys(MODS)) if (!S.modules.find(m => m.k === k)) S.modules.push({ k, on: true });
@@ -310,17 +321,48 @@ function vHome() {
 }
 
 /* ============ PLAN ============ */
-const planSort = (a, b) => (a.date || '9999').localeCompare(b.date || '9999') || (a.time || '99').localeCompare(b.time || '99');
+const planKey = p => { if (!p.date || !p.time) return null; try { return localToUTC(p.date, p.time, tzOf(p)); } catch (e) { return null; } };
+const planSort = (a, b) => {
+  const d = (a.date || '9999').localeCompare(b.date || '9999'); if (d) return d;
+  const ka = planKey(a), kb = planKey(b);
+  if (ka != null && kb != null) return ka - kb;
+  if (ka == null && kb == null) return 0;
+  return ka == null ? 1 : -1;
+};
+function fixArrDate(date, time, tz, arrDate, arrTime, arrTz) {
+  if (!date || !time || !arrTime) return arrDate || date;
+  let ad = arrDate || date;
+  try {
+    const dep = localToUTC(date, time, tz);
+    for (let i = 0; i < 3 && localToUTC(ad, arrTime, arrTz) <= dep; i++) ad = dstr(new Date(parseD(ad).getTime() + 864e5));
+  } catch (e) { }
+  return ad;
+}
+const fmtDur = m => m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? ' ' + (m % 60) + '분' : ''}` : `${m}분`;
+function tripInfo(p) {
+  const mv = p.mv || {}, from = mv.from ? byId('places', mv.from) : null, to = mv.to ? byId('places', mv.to) : null;
+  const arrTz = mv.arrTz || tzOf(p);
+  let dur = '';
+  if (p.date && p.time && mv.arrDate && mv.arrTime) { try { const m = Math.round((localToUTC(mv.arrDate, mv.arrTime, arrTz) - localToUTC(p.date, p.time, tzOf(p))) / 6e4); if (m > 0) dur = fmtDur(m); } catch (e) { } }
+  const plus = mv.arrDate && p.date && mv.arrDate !== p.date ? diffDays(p.date, mv.arrDate) : 0;
+  const arr = mv.arrTime ? `도착 ${mv.arrTime} ${TZS[arrTz].s}${plus ? ` (${plus > 0 ? '+' : ''}${plus}일)` : ''}` : '';
+  return { from, to, arrTz, dur, arr, mode: MODES[mv.mode] || null };
+}
 function planLi(p, withDate) {
   const pl = p.placeId ? byId('places', p.placeId) : null;
   const c = CATS[p.cat] || CATS.etc;
-  const sub = [withDate && p.date ? fmtD(p.date) : '', pl ? pl.name : '', p.memo].filter(Boolean).join(' · ');
+  let sub = [withDate && p.date ? fmtD(p.date) : '', pl ? pl.name : '', p.memo].filter(Boolean).join(' · ');
+  if (isTrip(p)) {
+    const t = tripInfo(p);
+    const rt = `${t.from ? t.from.name : '?'} → ${t.to ? t.to.name : '?'}`;
+    sub = [withDate && p.date ? fmtD(p.date) : '', p.mv.no, p.title === rt ? '' : rt, t.arr, t.dur, p.memo].filter(Boolean).join(' · ');
+  }
   const ks = inSeoul(p);
   return `<div class="li ${p.done ? 'done' : ''}" data-a="plan-edit" data-id="${p.id}">
     <button class="chk ${p.done ? 'on' : ''}" data-a="plan-done" data-id="${p.id}">${p.done ? ico('check', 'i s') : ''}</button>
     ${p.time ? `<div class="time">${esc(p.time)}<span class="tz">${TZS[tzOf(p)].s}</span></div>` : ''}
     <div class="m"><div class="t">${esc(p.title)}</div>${sub ? `<div class="d">${esc(sub)}</div>` : ''}${ks ? `<div class="d kst">${ks}</div>` : ''}</div>
-    ${tag(c.n, c.c)}</div>`;
+    ${isTrip(p) && p.mv.mode ? tag(MODES[p.mv.mode].n, c.c) : tag(c.n, c.c)}</div>`;
 }
 function vPlan() {
   let h = hd('일정', `<button class="ib" data-a="xl-import" title="엑셀로 가져오기">${ico('import')}</button>`);
@@ -330,7 +372,7 @@ function vPlan() {
   const t = todayStr();
   for (const [d, arr] of Object.entries(groups)) {
     const dn = d ? dayNum(d) : null;
-    const zs = [...new Set(arr.map(tzOf))].map(z => TZS[z].n + ' 시간').join(' → ');
+    const zs = [...new Set(arr.flatMap(p => isTrip(p) && p.mv.arrTz ? [tzOf(p), p.mv.arrTz] : [tzOf(p)]))].map(z => TZS[z].n + ' 시간').join(' → ');
     h += `<div class="day"><span class="n">${d ? fmtD(d) : '날짜 미정'}</span>${dn && dn > 0 ? `<span class="s">Day ${dn}</span>` : ''}${d === t ? '<span class="today">오늘</span>' : ''}${d ? `<span class="zone">${zs}</span>` : ''}</div>
       <div class="sec" style="margin-top:0"><div class="list">${arr.map(p => planLi(p)).join('')}</div></div>`;
   }
@@ -340,28 +382,84 @@ function planForm(p) {
   const isNew = !p;
   p = p ? { ...p } : { id: uid(), date: ui.lastPlanDate || '', time: '', title: '', cat: 'see', placeId: '', memo: '', done: false, tz: ui.lastTz || S.settings.tz };
   const TZP = Object.fromEntries(Object.entries(TZS).map(([k, v]) => [k, { n: `${v.n} ${v.s}` }]));
+  const mv = p.mv || {};
   const opts = `<option value="">연결 안 함</option>` + S.places.map(x => `<option value="${x.id}" ${x.id === p.placeId ? 'selected' : ''}>${esc(x.name)}</option>`).join('');
   sheet({
     title: isNew ? '일정 추가' : '일정 수정',
     body: `<div class="f"><label>무엇을 하나요</label><input class="in" id="fTitle" value="${esc(p.title)}" placeholder="예: 인앤아웃 점심"></div>
-      <div class="f"><label>종류</label>${pick('fCat', CATS, p.cat)}</div>
+      <div class="f"><label>종류</label>${pick('fCat', PLCATS, p.cat)}</div>
       <div class="f two"><div><label>날짜</label><input class="in" type="date" id="fDate" value="${esc(p.date)}"></div><div><label>시간</label><input class="in" type="time" id="fTime" value="${esc(p.time)}"></div></div>
-      <div class="f"><label>어디 시간 기준?</label>${pick('fTz', TZP, tzOf(p))}<div class="coord" id="fKst"></div></div>
-      <div class="f"><label>장소 연결</label><select class="in" id="fPlace">${opts}</select></div>
+      <div class="f"><label id="fTzLbl">어디 시간 기준?</label>${pick('fTz', TZP, tzOf(p))}<div class="coord" id="fKst"></div></div>
+      <div id="mvBox" style="display:none">
+        <div class="f"><label>타는 것</label>${pick('fMode', MODES, mv.mode || (p.cat === 'flight' ? 'flight' : 'bus'))}</div>
+        <div class="f"><label>편명·노선 (선택)</label><input class="in" id="fNo" value="${esc(mv.no || '')}" placeholder="예: YP111, FlixBus 2690"></div>
+        <div class="f two"><div><label>출발지</label><input class="in" id="fFrom" list="plList" value="${esc(nameOf(mv.from))}" placeholder="예: ICN 인천공항"></div><div><label>도착지</label><input class="in" id="fTo" list="plList" value="${esc(nameOf(mv.to))}" placeholder="예: SFO 공항"></div></div>
+        <datalist id="plList">${S.places.map(x => `<option value="${esc(x.name)}">`).join('')}</datalist>
+        <div class="f two"><div><label>도착 날짜</label><input class="in" type="date" id="fArrDate" value="${esc(mv.arrDate || '')}"></div><div><label>도착 시간</label><input class="in" type="time" id="fArrTime" value="${esc(mv.arrTime || '')}"></div></div>
+        <div class="f"><label>도착 시간은 어디 기준?</label>${pick('fArrTz', TZP, mv.arrTz || tzOf(p))}<div class="coord" id="fDur"></div></div>
+        <div class="coord" style="line-height:1.5">출발지·도착지는 장소 탭에 '공항'·'교통'으로 저장되고, 인터넷이 되면 위치도 자동으로 찾아 지도에 화살표로 이어져요</div>
+      </div>
+      <div class="f" id="plBox"><label>장소 연결</label><select class="in" id="fPlace">${opts}</select></div>
       <div class="f"><label>메모</label><textarea class="in" id="fMemo" placeholder="예약 시간, 준비물 등">${esc(p.memo)}</textarea></div>`,
     foot: `${isNew ? '' : `<button class="btn big red" data-a="plan-del" data-id="${p.id}" style="flex:0 0 90px">삭제</button>`}<button class="btn big pri" data-a="sheet-ok">저장</button>`,
     mount: () => {
-      const upd = () => { const k = inSeoul({ date: $('#fDate').value, time: $('#fTime').value, tz: pickVal('fTz') }); $('#fKst').textContent = k ? `→ ${k.replace('한국', '한국 시간')}` : ''; };
-      ['fDate', 'fTime'].forEach(i => $('#' + i).addEventListener('input', upd)); $('#fTz').addEventListener('click', () => setTimeout(upd)); upd();
+      const upd = () => {
+        const tr = ['move', 'flight'].includes(pickVal('fCat'));
+        $('#mvBox').style.display = tr ? '' : 'none'; $('#plBox').style.display = tr ? 'none' : '';
+        $('#fTzLbl').textContent = tr ? '출발 시간은 어디 기준?' : '어디 시간 기준?';
+        $('#fTitle').placeholder = tr ? '비우면 "출발지 → 도착지"로 들어가요' : '예: 인앤아웃 점심';
+        const k = inSeoul({ date: $('#fDate').value, time: $('#fTime').value, tz: pickVal('fTz') }); $('#fKst').textContent = k ? `→ ${k.replace('한국', '한국 시간')}` : '';
+        const ad = fixArrDate($('#fDate').value, $('#fTime').value, pickVal('fTz'), $('#fArrDate').value, $('#fArrTime').value, pickVal('fArrTz'));
+        if ($('#fArrTime').value && ad && ad !== $('#fArrDate').value) $('#fArrDate').value = ad;
+        const t = tripInfo({ date: $('#fDate').value, time: $('#fTime').value, tz: pickVal('fTz'), mv: { arrDate: ad, arrTime: $('#fArrTime').value, arrTz: pickVal('fArrTz') } });
+        const ak = $('#fArrTime').value ? inSeoul({ date: ad, time: $('#fArrTime').value, tz: pickVal('fArrTz') }) : '';
+        $('#fDur').textContent = [t.dur ? `걸리는 시간 ${t.dur}` : '', ak ? `도착 ${ak.replace('한국', '한국 시간')}` : ''].filter(Boolean).join(' · ');
+      };
+      ['fDate', 'fTime', 'fArrDate', 'fArrTime'].forEach(i => $('#' + i).addEventListener('input', upd));
+      ['fTz', 'fArrTz', 'fCat'].forEach(i => $('#' + i).addEventListener('click', () => setTimeout(upd)));
+      const setMode = k => $$('#fMode button').forEach(b => b.classList.toggle('on', b.dataset.k === k));
+      $('#fCat').addEventListener('click', () => setTimeout(() => { const c = pickVal('fCat'), m = pickVal('fMode'); if (c === 'flight' && m !== 'flight') setMode('flight'); if (c === 'move' && m === 'flight') setMode('bus'); }));
+      $('#fMode').addEventListener('click', () => setTimeout(() => { const m = pickVal('fMode'); if (m === 'flight' && pickVal('fCat') === 'move') $$('#fCat button').forEach(b => b.classList.toggle('on', b.dataset.k === 'flight')); }));
+      $('#fDate').addEventListener('change', () => { if (!$('#fArrDate').value) $('#fArrDate').value = $('#fDate').value; upd(); });
+      upd();
     },
     ok: () => {
-      const title = $('#fTitle').value.trim(); if (!title) { toast('내용을 입력해주세요'); return false; }
-      Object.assign(p, { title, cat: pickVal('fCat'), date: $('#fDate').value, time: $('#fTime').value, tz: pickVal('fTz'), placeId: $('#fPlace').value, memo: $('#fMemo').value.trim() });
+      const tr = ['move', 'flight'].includes(pickVal('fCat'));
+      let title = $('#fTitle').value.trim();
+      if (tr) {
+        const fn = $('#fFrom').value.trim(), tn = $('#fTo').value.trim(), mode = pickVal('fMode');
+        if (!title && !(fn && tn)) { toast('출발지·도착지나 제목을 입력해주세요'); return false; }
+        if (!title) title = `${fn} → ${tn}`;
+        const pc = mode === 'flight' ? 'airport' : 'move';
+        p.mv = { mode, no: $('#fNo').value.trim(), from: ensurePlace(fn, pc, mode), to: ensurePlace(tn, pc, mode), arrDate: fixArrDate($('#fDate').value, $('#fTime').value, pickVal('fTz'), $('#fArrDate').value, $('#fArrTime').value, pickVal('fArrTz')), arrTime: $('#fArrTime').value, arrTz: pickVal('fArrTz') };
+        p.placeId = p.mv.from || p.mv.to || '';
+      } else { delete p.mv; }
+      if (!title) { toast('내용을 입력해주세요'); return false; }
+      Object.assign(p, { title, cat: pickVal('fCat'), date: $('#fDate').value, time: $('#fTime').value, tz: pickVal('fTz'), placeId: tr ? p.placeId : $('#fPlace').value, memo: $('#fMemo').value.trim() });
       ui.lastPlanDate = p.date; ui.lastTz = p.tz;
       if (map) updateRoute();
       upsert('plans', p); toast(isNew ? '일정을 추가했어요' : '저장했어요');
     },
   });
+}
+
+const nameOf = id => { const x = id && byId('places', id); return x ? x.name : ''; };
+// find a place by name or create a transport stop (and look up its location in the background)
+function ensurePlace(name, cat, mode) {
+  name = (name || '').trim(); if (!name) return '';
+  let pl = S.places.find(x => x.name.trim().toLowerCase() === name.toLowerCase());
+  if (pl) return pl.id;
+  pl = { id: uid(), name, cat, status: 'none', lat: '', lng: '', address: '', memo: '', date: '', url: '', rating: 0 };
+  S.places.push(pl);
+  geocodeLater(pl, mode === 'flight' && !/공항|airport/i.test(name) ? name + ' airport' : name);
+  return pl.id;
+}
+async function geocodeLater(pl, q) {
+  try {
+    const r = (await photon(q.replace(/[()]/g, ' '), null))[0]; if (!r) return;
+    pl.lat = +r.lat.toFixed(6); pl.lng = +r.lng.toFixed(6); if (!pl.address) pl.address = r.addr;
+    save(); if (map) drawMarkers(); if (ui.tab === 'place') render();
+  } catch (e) { }
 }
 
 /* ============ EXCEL IMPORT ============ */
@@ -404,7 +502,7 @@ async function importExcel(file) {
   if (hi < 0) { toast('"할 일" 칸이 있는 양식이 아니에요'); return; }
   const H = rows[hi].map(norm);
   const col = (...names) => H.findIndex(h => names.includes(h));
-  const C = { tz: col('기준시간', '시간대', '기준'), date: col('날짜'), time: col('시간', '시작', '시작시간'), end: col('끝', '종료', '끝시간', '종료시간'), title: col('할일', '일정', '제목'), kind: col('종류'), place: col('장소'), memo: col('메모'), cost: col('비용'), cur: col('통화') };
+  const C = { arrTz: col('도착기준시간', '도착시간대'), tz: col('기준시간', '출발기준시간', '시간대', '기준'), date: col('날짜'), time: col('시간', '시작', '시작시간'), end: col('끝', '종료', '끝시간', '종료시간'), title: col('할일', '일정', '제목'), kind: col('종류'), place: col('장소'), memo: col('메모'), cost: col('비용'), cur: col('통화') };
   let added = 0, dup = 0, newPlaces = 0, filled = 0;
   for (const r of rows.slice(hi + 1)) {
     const get = i => (i >= 0 ? r[i] : '');
@@ -415,7 +513,16 @@ async function importExcel(file) {
     const p = { id: uid(), date: xlDate(get(C.date)), time: xlTime(get(C.time)), title, cat: kindKey(get(C.kind)), placeId: '', memo, done: false, tz: tzFromText(get(C.tz)) || S.settings.tz };
     if (S.plans.some(x => x.title === p.title && (x.date || '') === p.date && (x.time || '') === p.time)) { dup++; continue; }
     const pn = String(get(C.place)).trim();
-    if (pn) {
+    const legs = pn.split(/\s*(?:→|->|>|➡)\s*/).filter(Boolean);
+    if ((p.cat === 'move' || p.cat === 'flight') && legs.length === 2) {
+      const mode = p.cat === 'flight' ? 'flight' : (/flix|버스|bus/i.test(title + pn) ? 'bus' : /기차|amtrak|train/i.test(title + pn) ? 'train' : 'bus');
+      const pc = mode === 'flight' ? 'airport' : 'move';
+      const nb = S.places.length;
+      p.mv = { mode, no: '', from: ensurePlace(legs[0], pc, mode), to: ensurePlace(legs[1], pc, mode), arrDate: p.date, arrTime: end, arrTz: tzFromText(get(C.arrTz)) || p.tz };
+      p.mv.arrDate = fixArrDate(p.date, p.time, p.tz, p.date, end, p.mv.arrTz);
+      p.placeId = p.mv.from; p.memo = [ (p.memo || '').replace('~' + end, '').replace(/^ · /, '') ].filter(Boolean).join('');
+      newPlaces += S.places.length - nb;
+    } else if (pn) {
       let pl = S.places.find(x => x.name.trim().toLowerCase() === pn.toLowerCase());
       if (!pl) { pl = { id: uid(), name: pn, cat: PCATS[p.cat] ? p.cat : 'etc', status: 'want', lat: '', lng: '', address: '', memo: '', date: p.date, url: '', rating: 0 }; S.places.push(pl); newPlaces++; }
       p.placeId = pl.id;
@@ -449,28 +556,28 @@ function vPlace() {
   return h + fab('place-add');
 }
 function placeLi(p) {
-  const st = STATUS[p.status] || STATUS.want;
+  const st = stOf(p);
   const sub = [p.date ? fmtD(p.date) : '', p.address || p.city || '', p.memo].filter(Boolean).join(' · ');
   const nph = S.photos.filter(x => x.placeId === p.id).length;
   return `<div class="li" data-a="place-open" data-id="${p.id}">${catIco(p.cat)}
-    <div class="m"><div class="t">${esc(p.name)}</div><div class="d">${tag(st.n, st.c)} ${esc(sub)}</div></div>
+    <div class="m"><div class="t">${esc(p.name)}</div><div class="d">${st ? tag(st.n, st.c) + ' ' : ''}${esc(sub)}</div></div>
     ${nph ? `<span class="sub">${ico('image', 'i s')}</span>` : ''}<span class="chev">${ico('chev', 'i s')}</span></div>`;
 }
 function placeDetail(id) {
   const p = byId('places', id); if (!p) return;
-  const st = STATUS[p.status] || STATUS.want, c = CATS[p.cat] || CATS.etc;
+  const st = stOf(p), c = CATS[p.cat] || CATS.etc;
   const phs = S.photos.filter(x => x.placeId === p.id);
   const plans = S.plans.filter(x => x.placeId === p.id).sort(planSort);
   const exps = S.expenses.filter(x => x.placeId === p.id);
   const spent = exps.reduce((a, e) => a + toKRW(num(e.amount), e.cur), 0);
   sheet({
     title: p.name,
-    body: `<div class="row" style="gap:6px;margin-top:2px">${tag(c.n, c.c)}${tag(st.n, st.c)}${p.rating ? tag('★'.repeat(p.rating), '#F5A623') : ''}</div>
+    body: `<div class="row" style="gap:6px;margin-top:2px">${tag(c.n, c.c)}${st ? tag(st.n, st.c) : ''}${p.rating ? tag('★'.repeat(p.rating), '#F5A623') : ''}</div>
       ${p.address ? `<div class="f"><label>주소</label><div class="row"><div style="flex:1;line-height:1.45">${esc(p.address)}</div><button class="ib" style="color:var(--t3)" data-a="copy" data-t="${esc(p.address)}">${ico('copy', 'i s')}</button></div></div>` : ''}
       ${p.date ? `<div class="f"><label>날짜</label>${fmtD(p.date)}</div>` : ''}
       ${p.memo ? `<div class="f"><label>메모</label><div style="white-space:pre-wrap;line-height:1.5">${esc(p.memo)}</div></div>` : ''}
       ${p.url ? `<div class="f"><label>링크</label><button style="color:var(--blue);text-align:left;word-break:break-all" data-a="url" data-u="${esc(p.url)}">${esc(p.url)}</button></div>` : ''}
-      <div class="f"><label>상태</label><div class="seg">${Object.entries(STATUS).map(([k, v]) => `<button class="${p.status === k ? 'on' : ''}" data-a="place-status" data-id="${p.id}" data-k="${k}">${v.n}</button>`).join('')}</div></div>
+      <div class="f"><label>상태</label><div class="seg">${Object.entries(PSTATUS()).map(([k, v]) => `<button class="${(STATUS[p.status] ? p.status : 'none') === k ? 'on' : ''}" data-a="place-status" data-id="${p.id}" data-k="${k}">${v.n}</button>`).join('')}</div></div>
       ${plans.length ? `<div class="f"><label>연결된 일정</label>${plans.map(x => `<div style="padding:4px 0">${x.date ? fmtDs(x.date) + ' ' : ''}${esc(x.title)}</div>`).join('')}</div>` : ''}
       ${exps.length ? `<div class="f"><label>여기서 쓴 돈</label>${fmtKRW(spent)}</div>` : ''}
       ${phs.length ? `<div class="f"><label>사진 ${phs.length}</label><div class="thumbs">${phs.map(x => `<img data-thumb="${x.id}" data-a="photo-open" data-id="${x.id}" data-place="${p.id}">`).join('')}</div></div>` : ''}
@@ -491,7 +598,7 @@ function placeForm(draft, isNew) {
         <div class="coord" id="fCoord">${hasLoc ? `${ico('pin', 'i s')} 위치 저장됨 (${(+p.lat).toFixed(4)}, ${(+p.lng).toFixed(4)})` : '위치가 없으면 지도에 안 보여요'}</div>
         <div class="btns" style="margin-top:8px"><button class="btn" data-a="loc-pin">${ico('globe', 'i s')}지도에서 찍기</button><button class="btn" data-a="loc-me">${ico('nav', 'i s')}현재 위치</button></div></div>
       <div class="f"><label>종류</label>${pick('fCat', PCATS, p.cat)}</div>
-      <div class="f"><label>상태</label>${pick('fStat', STATUS, p.status)}</div>
+      <div class="f"><label>상태 (선택)</label>${pick('fStat', PSTATUS(), STATUS[p.status] ? p.status : 'none')}</div>
       <div class="f"><label>주소</label><input class="in" id="fAddr" value="${esc(p.address)}"></div>
       <div class="f"><label>갈 날짜</label><input class="in" type="date" id="fDate" value="${esc(p.date)}"></div>
       <div class="f"><label>별점 (다녀온 뒤)</label><div class="pick" id="fRate">${[1, 2, 3, 4, 5].map(n => `<button data-a="rate" data-n="${n}" class="${p.rating >= n ? 'on' : ''}">★</button>`).join('')}</div></div>
@@ -991,7 +1098,7 @@ async function ensureMap() {
   map.on('click', async e => {
     if (!pinMode) {
       const hit = map.getLayer('route-hit') && S.settings.showRoute ? map.queryRenderedFeatures(e.point, { layers: ['route-hit'] }) : [];
-      if (hit.length) { routeSheet(hit[0].properties.pid); return; }
+      if (hit.length) { routeSheet(hit[0].properties.pid, hit[0].properties.ride, hit[0].properties.i); return; }
       hideMcard(); return;
     }
     const { lat, lng } = e.lngLat;
@@ -1011,14 +1118,24 @@ async function ensureMap() {
 /* route arrows: places linked to dated plans, in time order */
 function routeSegments() {
   const hasLoc = pl => pl && pl.lat !== '' && pl.lat != null && isFinite(pl.lat);
-  const steps = S.plans.filter(p => p.date && p.placeId && hasLoc(byId('places', p.placeId)))
-    .sort(planSort);
+  const steps = [];
+  S.plans.filter(p => p.date).sort(planSort).forEach(p => {
+    if (isTrip(p)) {
+      const f = byId('places', p.mv.from), t = byId('places', p.mv.to);
+      if (hasLoc(f)) steps.push({ pl: f, plan: p });
+      if (hasLoc(t)) steps.push({ pl: t, plan: p, arr: true });
+    } else if (p.placeId && hasLoc(byId('places', p.placeId))) steps.push({ pl: byId('places', p.placeId), plan: p });
+  });
   const segs = [];
   for (let i = 1; i < steps.length; i++) {
-    const a = byId('places', steps[i - 1].placeId), b = byId('places', steps[i].placeId);
-    if (a.id === b.id) continue;
-    const done = typeof steps[i].moved === 'boolean' ? steps[i].moved : !!steps[i - 1].done;
-    segs.push({ from: a, to: b, plan: steps[i], prev: steps[i - 1], done });
+    const A = steps[i - 1], B = steps[i];
+    if (A.pl.id === B.pl.id) continue;
+    if (B.arr && A.plan === B.plan) { // a ride: its own check decides
+      const p = B.plan; segs.push({ from: A.pl, to: B.pl, plan: p, prev: p, ride: true, done: typeof p.moved === 'boolean' ? p.moved : !!p.done });
+    } else {
+      const key = A.plan.id + '>' + B.plan.id, ov = (S.legDone || {})[key];
+      segs.push({ from: A.pl, to: B.pl, plan: B.plan, prev: A.plan, done: typeof ov === 'boolean' ? ov : !!A.plan.done, key });
+    }
   }
   return segs;
 }
@@ -1026,11 +1143,12 @@ function routeGeo() {
   return {
     type: 'FeatureCollection', features: routeSegments().map((g, i) => {
       // slight arc so back-and-forth trips don't overlap
-      const [x1, y1, x2, y2] = [+g.from.lng, +g.from.lat, +g.to.lng, +g.to.lat];
-      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, dx = x2 - x1, dy = y2 - y1, k = 0.12;
+      let [x1, y1, x2, y2] = [+g.from.lng, +g.from.lat, +g.to.lng, +g.to.lat];
+      if (x2 - x1 > 180) x2 -= 360; else if (x1 - x2 > 180) x2 += 360; // cross the Pacific, not the whole world
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, dx = x2 - x1, dy = y2 - y1, k = Math.min(0.12, 4 / (Math.hypot(dx, dy) || 1));
       const cx = mx - dy * k, cy = my + dx * k, pts = [];
       for (let t = 0; t <= 1.0001; t += 1 / 24) pts.push([(1 - t) * (1 - t) * x1 + 2 * (1 - t) * t * cx + t * t * x2, (1 - t) * (1 - t) * y1 + 2 * (1 - t) * t * cy + t * t * y2]);
-      return { type: 'Feature', properties: { i, done: g.done ? 1 : 0, pid: g.plan.id }, geometry: { type: 'LineString', coordinates: pts } };
+      return { type: 'Feature', properties: { i, done: g.done ? 1 : 0, pid: g.plan.id, ride: g.ride ? 1 : 0 }, geometry: { type: 'LineString', coordinates: pts } };
     }),
   };
 }
@@ -1055,16 +1173,27 @@ function updateRoute() {
   if (src) src.setData(routeGeo()); else if (map.isStyleLoaded()) addRouteLayers();
   const b = $('#routeBtn'); if (b) b.classList.toggle('on', !!S.settings.showRoute);
 }
-function routeSheet(pid) {
-  const seg = routeSegments().find(g => g.plan.id === pid); if (!seg) return;
+function routeSheet(pid, ride, idx) {
+  const all = routeSegments(); const seg = all[idx] && all[idx].plan.id === pid ? all[idx] : all.find(g => g.plan.id === pid); if (!seg) return;
   const p = seg.plan, q = seg.prev, ks = inSeoul(p);
+  if (seg.ride) {
+    const t = tripInfo(p);
+    sheet({
+      title: `${seg.from.name} → ${seg.to.name}`,
+      body: `<div class="row" style="gap:6px">${tag(seg.done ? '이동 완료' : '아직', seg.done ? '#1B64DA' : '#8B95A1')}${t.mode ? tag(t.mode.n + (p.mv.no ? ' ' + p.mv.no : ''), '#3182F6') : ''}</div>
+        <div class="f"><label>출발</label><div style="font-weight:600">${fmtD(p.date)}${p.time ? ` · ${p.time} ${TZS[tzOf(p)].n} 시간` : ''}</div>${ks ? `<div class="sub" style="margin-top:4px">${ks}</div>` : ''}</div>
+        ${p.mv.arrTime ? `<div class="f"><label>도착</label><div style="font-weight:600">${fmtD(p.mv.arrDate || p.date)} · ${p.mv.arrTime} ${TZS[t.arrTz].n} 시간</div>${t.dur ? `<div class="sub" style="margin-top:4px">걸리는 시간 ${t.dur}</div>` : ''}</div>` : ''}`,
+      foot: `<button class="btn big" data-a="route-plan" data-id="${p.id}">일정 보기</button><button class="btn big pri" data-a="route-done" data-id="${p.id}" data-v="${seg.done ? 0 : 1}">${seg.done ? '완료 취소' : '탔어요'}</button>`,
+    });
+    return;
+  }
   sheet({
     title: `${seg.from.name} → ${seg.to.name}`,
     body: `<div class="row" style="gap:6px">${tag(seg.done ? '이동 완료' : '아직', seg.done ? '#1B64DA' : '#8B95A1')}</div>
       <div class="f"><label>출발 일정</label><div style="font-weight:600">${esc(q.title)}</div><div class="sub" style="margin-top:4px">${fmtD(q.date)}${q.time ? ` · ${q.time} ${TZS[tzOf(q)].n} 시간` : ''}</div></div>
       <div class="f"><label>도착 일정</label><div style="font-weight:600">${esc(p.title)}</div><div class="sub" style="margin-top:4px">${fmtD(p.date)}${p.time ? ` · ${p.time} ${TZS[tzOf(p)].n} 시간` : ''}${ks ? ` (${ks})` : ''}</div></div>
-      <div class="coord" style="margin-top:14px;line-height:1.5">출발 일정을 체크하면 자동으로 진해져요. 여기서 직접 바꿀 수도 있어요</div>`,
-    foot: `<button class="btn big" data-a="route-plan" data-id="${p.id}">일정 보기</button><button class="btn big pri" data-a="route-done" data-id="${p.id}" data-v="${seg.done ? 0 : 1}">${seg.done ? '완료 취소' : '이동 완료로 표시'}</button>`,
+      <div class="coord" style="margin-top:14px;line-height:1.5">출발 일정을 체크하면 자동으로 진해져요. 교통편으로 넣으면 그 교통편 체크로 바뀌어요</div>`,
+    foot: `<button class="btn big" data-a="route-plan" data-id="${p.id}">일정 보기</button><button class="btn big pri" data-a="route-done" data-id="${p.id}" data-key="${esc(seg.key)}" data-v="${seg.done ? 0 : 1}">${seg.done ? '완료 취소' : '이동 완료로 표시'}</button>`,
   });
 }
 
@@ -1096,10 +1225,10 @@ function fitAll() {
 }
 function showMcard(id) {
   const p = byId('places', id); if (!p) return;
-  const c = CATS[p.cat] || CATS.etc, st = STATUS[p.status] || STATUS.want;
+  const c = CATS[p.cat] || CATS.etc, st = stOf(p);
   const ph = S.photos.filter(x => x.placeId === p.id).slice(0, 6);
   const el = $('#mcard');
-  el.innerHTML = `<div class="row">${catIco(p.cat)}<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</div><div style="margin-top:4px">${tag(c.n, c.c)} ${tag(st.n, st.c)} ${p.date ? `<span class="sub">${fmtD(p.date)}</span>` : ''}</div></div><button style="color:var(--t3)" data-a="mcard-x">${ico('x')}</button></div>
+  el.innerHTML = `<div class="row">${catIco(p.cat)}<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</div><div style="margin-top:4px">${tag(c.n, c.c)} ${st ? tag(st.n, st.c) : ''} ${p.date ? `<span class="sub">${fmtD(p.date)}</span>` : ''}</div></div><button style="color:var(--t3)" data-a="mcard-x">${ico('x')}</button></div>
     ${p.address ? `<div class="sub" style="margin-top:10px">${esc(p.address)}</div>` : ''}
     ${ph.length ? `<div class="thumbs">${ph.map(x => `<img data-thumb="${x.id}" data-a="photo-open" data-id="${x.id}" data-place="${p.id}">`).join('')}</div>` : ''}
     <div class="btns"><button class="btn" data-a="place-open" data-id="${p.id}">상세</button><button class="btn pri" data-a="url" data-u="${esc(gdir(p))}">${ico('nav', 'i s')}길찾기</button></div>`;
@@ -1206,7 +1335,11 @@ const A = {
   'plan-add': () => planForm(),
   'plan-edit': el => planForm(byId('plans', el.dataset.id)),
   'plan-done': el => { const p = byId('plans', el.dataset.id); p.done = !p.done; save(); render(); if (map) updateRoute(); },
-  'route-done': el => { const p = byId('plans', el.dataset.id); p.moved = el.dataset.v === '1'; save(); closeSheet(); updateRoute(); toast(p.moved ? '이 구간을 완료했어요' : '완료를 취소했어요'); },
+  'route-done': el => {
+    const v = el.dataset.v === '1';
+    if (el.dataset.key) { S.legDone = S.legDone || {}; S.legDone[el.dataset.key] = v; } else byId('plans', el.dataset.id).moved = v;
+    save(); closeSheet(); updateRoute(); toast(v ? '이 구간을 완료했어요' : '완료를 취소했어요');
+  },
   'route-plan': el => { closeSheet(); planForm(byId('plans', el.dataset.id)); },
   'map-route': () => { S.settings.showRoute = !S.settings.showRoute; save(); if (map) ['route-todo', 'route-done', 'route-arrow', 'route-hit'].forEach(l => map.getLayer(l) && map.setLayoutProperty(l, 'visibility', S.settings.showRoute ? 'visible' : 'none')); updateRoute(); toast(S.settings.showRoute ? '이동 경로 표시' : '이동 경로 숨김'); },
   'plan-del': el => confirmSheet('일정을 삭제할까요?', '되돌릴 수 없어요', '삭제', () => { S.plans = S.plans.filter(x => x.id !== el.dataset.id); save(); closeSheet(); render(); }),
