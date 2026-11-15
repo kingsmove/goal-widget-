@@ -118,6 +118,7 @@ svg.s{width:18px;height:18px}
 .seg{display:flex;background:var(--card2);border-radius:12px;padding:3px;gap:2px}
 .seg button{flex:1;padding:9px 0;border-radius:10px;font-size:14px;font-weight:600;color:var(--t3)}
 .seg button.on{background:var(--card);color:var(--t1);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+:root[data-theme=dark] .blk b{filter:none}
 :root[data-theme=dark] .seg button.on{background:#3A3A42}
 
 /* booking */
@@ -217,3 +218,32 @@ textarea.in{height:auto;min-height:84px;padding:13px 15px;resize:none;line-heigh
 .hero .clock{display:flex;gap:18px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.22)}
 .hero .clock span{font-size:12px;opacity:.8;margin-right:6px}
 .hero .clock b{font-size:16px;font-weight:700}
+
+/* timetable */
+.ttnote{margin:10px 16px 0;font-size:12.5px;color:var(--blue);background:var(--blue-bg);padding:9px 12px;border-radius:12px;line-height:1.45}
+.tt{margin:10px 10px 0;overflow:auto;background:var(--card);border-radius:18px;position:relative;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.tgrid{display:flex;min-width:max-content}
+.taxis{position:sticky;left:0;z-index:6;background:var(--card);width:50px;flex:none;border-right:1px solid var(--line)}
+.taxis .thead{background:var(--card);z-index:7}
+.taxis .tallrow small{font-size:9.5px;color:var(--t3);display:block;text-align:center;line-height:30px}
+.taxis .lab{position:absolute;right:6px;font-size:10.5px;font-weight:600;color:var(--t3);transform:translateY(-50%);background:var(--card);padding:0 2px}
+.taxis .lab:first-child{transform:none}
+.tcol{width:132px;flex:none;border-right:1px solid var(--line)}
+.thead{position:sticky;top:0;z-index:5;height:54px;background:var(--c);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.tcol .thead b{font-size:13.5px;font-weight:700}
+.tcol .thead span{font-size:10.5px;font-weight:600;opacity:.85}
+.tcol .thead span.dup{opacity:1;background:rgba(255,255,255,.25);padding:1px 7px;border-radius:6px}
+.tallrow{height:30px;border-bottom:1px solid var(--line);padding:3px;overflow:hidden}
+.tall{width:100%;height:24px;border-radius:7px;background:var(--card2);font-size:11px;font-weight:600;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 6px}
+.tbody{position:relative;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(rgba(139,149,161,.14) 1px,transparent 1px);background-size:100% 52px,100% 26px}
+.blk{position:absolute;border-radius:8px;padding:3px 6px;overflow:hidden;background:var(--cb);border-left:3px solid var(--c);color:var(--t1);cursor:pointer;z-index:1}
+.blk b{display:block;font-size:11.5px;font-weight:700;line-height:1.25;color:var(--c);word-break:keep-all;filter:saturate(1.1) brightness(.85)}
+.blk span{display:block;font-size:10px;color:var(--t3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.blk.mark{border-left-style:dashed;background:var(--cm)}
+.blk.dn{opacity:.5}
+.blk.drag{outline:1.5px dashed var(--c);outline-offset:-1px;touch-action:none;cursor:grab}
+.blk.dragging{z-index:10;box-shadow:0 8px 22px rgba(0,0,0,.22);opacity:.95;cursor:grabbing}
+.blk .rz{position:absolute;left:0;right:0;bottom:0;height:12px;cursor:ns-resize;touch-action:none}
+.blk .rz::after{content:"";position:absolute;left:50%;bottom:3px;width:22px;height:3px;border-radius:2px;background:var(--c);transform:translateX(-50%);opacity:.7}
+.nowline{position:absolute;left:0;right:0;height:2px;background:#F04452;z-index:3;pointer-events:none}
+.nowline::before{content:"";position:absolute;left:-3px;top:-3px;width:8px;height:8px;border-radius:50%;background:#F04452}
