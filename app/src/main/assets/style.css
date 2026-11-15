@@ -209,3 +209,11 @@ textarea.in{height:auto;min-height:84px;padding:13px 15px;resize:none;line-heigh
 
 #toast{position:fixed;left:50%;bottom:calc(92px + var(--safe-b));transform:translate(-50%,20px);background:rgba(25,31,40,.92);color:#fff;padding:12px 18px;border-radius:14px;font-size:14px;font-weight:600;opacity:0;transition:.25s;z-index:99999;pointer-events:none;white-space:nowrap}
 #toast.on{opacity:1;transform:translate(-50%,0)}
+
+.time{display:flex;flex-direction:column;line-height:1.25}
+.time .tz{font-size:10px;font-weight:700;color:var(--t4);letter-spacing:.3px}
+.li .d.kst{color:var(--blue);font-weight:600;font-size:12px;margin-top:2px}
+.day .zone{margin-left:auto;font-size:12px;font-weight:600;color:var(--t3);background:var(--card);padding:4px 9px;border-radius:8px}
+.hero .clock{display:flex;gap:18px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.22)}
+.hero .clock span{font-size:12px;opacity:.8;margin-right:6px}
+.hero .clock b{font-size:16px;font-weight:700}

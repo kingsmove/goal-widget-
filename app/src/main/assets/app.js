@@ -57,6 +57,46 @@ const MODS = {
   book: { n: '예약', i: 'ticket', c: '#7B61FF' },
 };
 
+/* ============ time zones ============ */
+const TZS = {
+  'Asia/Seoul': { n: '한국', s: 'KST' },
+  'Pacific/Honolulu': { n: '호놀룰루', s: 'HST' },
+  'America/Los_Angeles': { n: 'LA·베가스', s: 'PT' },
+  'America/Vancouver': { n: '밴쿠버', s: 'PT' },
+  'America/Edmonton': { n: '옐로나이프', s: 'MT' },
+  'America/Chicago': { n: '시카고', s: 'CT' },
+  'America/New_York': { n: '뉴욕', s: 'ET' },
+  'America/Toronto': { n: '토론토', s: 'ET' },
+};
+const tzOf = p => (p && p.tz && TZS[p.tz]) ? p.tz : (S.settings.tz || 'America/Los_Angeles');
+function tzParts(ms, tz) {
+  const o = {}; new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(ms)).forEach(x => o[x.type] = x.value);
+  return { y: +o.year, m: +o.month, d: +o.day, h: +o.hour % 24, mi: +o.minute };
+}
+function tzOffset(ms, tz) { const q = tzParts(ms, tz); return Date.UTC(q.y, q.m - 1, q.d, q.h, q.mi) - Math.floor(ms / 6e4) * 6e4; }
+function localToUTC(date, time, tz) {
+  const [y, m, d] = date.split('-').map(Number), [h, mi] = time.split(':').map(Number);
+  const guess = Date.UTC(y, m - 1, d, h, mi);
+  let u = guess - tzOffset(guess, tz); u = guess - tzOffset(u, tz); return u;
+}
+function inSeoul(p) {
+  if (!p.date || !p.time || tzOf(p) === 'Asia/Seoul') return '';
+  try {
+    const q = tzParts(localToUTC(p.date, p.time, tzOf(p)), 'Asia/Seoul');
+    const sameDay = `${q.y}-${pad(q.m)}-${pad(q.d)}` === p.date;
+    return `한국 ${sameDay ? '' : `${q.m}/${q.d} `}${pad(q.h)}:${pad(q.mi)}`;
+  } catch (e) { return ''; }
+}
+function nowIn(tz) { const q = tzParts(Date.now(), tz); return `${pad(q.h)}:${pad(q.mi)}`; }
+function tzFromText(v) {
+  const t = String(v || '').trim(); if (!t) return '';
+  if (TZS[t]) return t;
+  const rules = [[/한국|서울|KST|인천/i, 'Asia/Seoul'], [/호놀|하와이|HST/i, 'Pacific/Honolulu'], [/밴쿠버/i, 'America/Vancouver'], [/옐로|에드먼턴|캘거리|MT|덴버/i, 'America/Edmonton'],
+    [/시카고|CT/i, 'America/Chicago'], [/토론토/i, 'America/Toronto'], [/뉴욕|ET/i, 'America/New_York'], [/LA|로스|베가스|라스|PT|태평양|샌프/i, 'America/Los_Angeles']];
+  for (const [re, z] of rules) if (re.test(t)) return z;
+  return '';
+}
+
 /* ============ state ============ */
 const KEY = 'trip.v1';
 let S;
@@ -64,7 +104,7 @@ function seed() {
   const lvcc = uid(), union = uid();
   return {
     v: 1,
-    settings: { title: '미국 여행', route: 'LA · 라스베이거스 · 캐나다', start: '', end: '', rates: { USD: 1340, CAD: 970 }, budget: 0, theme: 'auto', cur: 'USD' },
+    settings: { title: '미국 여행', route: 'LA · 라스베이거스 · 캐나다', start: '', end: '', rates: { USD: 1340, CAD: 970 }, budget: 0, theme: 'auto', cur: 'USD', tz: 'America/Los_Angeles', showRoute: true },
     modules: ['plan', 'map', 'place', 'money', 'photo', 'book'].map(k => ({ k, on: true })),
     places: [
       { id: union, name: 'LA 유니언역 (플릭스버스)', cat: 'move', status: 'want', lat: 34.0562, lng: -118.2365, address: '800 N Alameda St, Los Angeles, CA', memo: '라스베이거스행 플릭스버스 출발지', date: '', url: '', rating: 0 },
@@ -219,7 +259,8 @@ function vHome() {
   let h = hd(st.title || '여행', `<button class="ib" data-a="settings">${ico('set')}</button>`);
   h += `<div class="hero"><svg class="globe" viewBox="0 0 24 24"><use href="#i-globe"/></svg>
     <div class="k">${k}</div><div class="big">${big}</div><div class="rng">${esc(rng)}</div>
-    ${route.length ? `<div class="route">${route.map(r => `<span>${esc(r)}</span>`).join('')}</div>` : ''}</div>`;
+    ${route.length ? `<div class="route">${route.map(r => `<span>${esc(r)}</span>`).join('')}</div>` : ''}
+    <div class="clock">${[...new Set([tzOf(null), 'Asia/Seoul'])].map(z => `<div><span>${TZS[z].n}</span><b>${nowIn(z)}</b></div>`).join('')}</div></div>`;
 
   const total = S.expenses.reduce((a, e) => a + toKRW(num(e.amount), e.cur), 0);
   const stats = [];
@@ -252,10 +293,11 @@ function planLi(p, withDate) {
   const pl = p.placeId ? byId('places', p.placeId) : null;
   const c = CATS[p.cat] || CATS.etc;
   const sub = [withDate && p.date ? fmtD(p.date) : '', pl ? pl.name : '', p.memo].filter(Boolean).join(' · ');
+  const ks = inSeoul(p);
   return `<div class="li ${p.done ? 'done' : ''}" data-a="plan-edit" data-id="${p.id}">
     <button class="chk ${p.done ? 'on' : ''}" data-a="plan-done" data-id="${p.id}">${p.done ? ico('check', 'i s') : ''}</button>
-    ${p.time ? `<div class="time">${esc(p.time)}</div>` : ''}
-    <div class="m"><div class="t">${esc(p.title)}</div>${sub ? `<div class="d">${esc(sub)}</div>` : ''}</div>
+    ${p.time ? `<div class="time">${esc(p.time)}<span class="tz">${TZS[tzOf(p)].s}</span></div>` : ''}
+    <div class="m"><div class="t">${esc(p.title)}</div>${sub ? `<div class="d">${esc(sub)}</div>` : ''}${ks ? `<div class="d kst">${ks}</div>` : ''}</div>
     ${tag(c.n, c.c)}</div>`;
 }
 function vPlan() {
@@ -266,27 +308,35 @@ function vPlan() {
   const t = todayStr();
   for (const [d, arr] of Object.entries(groups)) {
     const dn = d ? dayNum(d) : null;
-    h += `<div class="day"><span class="n">${d ? fmtD(d) : '날짜 미정'}</span>${dn && dn > 0 ? `<span class="s">Day ${dn}</span>` : ''}${d === t ? '<span class="today">오늘</span>' : ''}</div>
+    const zs = [...new Set(arr.map(tzOf))].map(z => TZS[z].n + ' 시간').join(' → ');
+    h += `<div class="day"><span class="n">${d ? fmtD(d) : '날짜 미정'}</span>${dn && dn > 0 ? `<span class="s">Day ${dn}</span>` : ''}${d === t ? '<span class="today">오늘</span>' : ''}${d ? `<span class="zone">${zs}</span>` : ''}</div>
       <div class="sec" style="margin-top:0"><div class="list">${arr.map(p => planLi(p)).join('')}</div></div>`;
   }
   return h + fab('plan-add');
 }
 function planForm(p) {
   const isNew = !p;
-  p = p ? { ...p } : { id: uid(), date: ui.lastPlanDate || '', time: '', title: '', cat: 'see', placeId: '', memo: '', done: false };
+  p = p ? { ...p } : { id: uid(), date: ui.lastPlanDate || '', time: '', title: '', cat: 'see', placeId: '', memo: '', done: false, tz: ui.lastTz || S.settings.tz };
+  const TZP = Object.fromEntries(Object.entries(TZS).map(([k, v]) => [k, { n: `${v.n} ${v.s}` }]));
   const opts = `<option value="">연결 안 함</option>` + S.places.map(x => `<option value="${x.id}" ${x.id === p.placeId ? 'selected' : ''}>${esc(x.name)}</option>`).join('');
   sheet({
     title: isNew ? '일정 추가' : '일정 수정',
     body: `<div class="f"><label>무엇을 하나요</label><input class="in" id="fTitle" value="${esc(p.title)}" placeholder="예: 인앤아웃 점심"></div>
       <div class="f"><label>종류</label>${pick('fCat', CATS, p.cat)}</div>
       <div class="f two"><div><label>날짜</label><input class="in" type="date" id="fDate" value="${esc(p.date)}"></div><div><label>시간</label><input class="in" type="time" id="fTime" value="${esc(p.time)}"></div></div>
+      <div class="f"><label>어디 시간 기준?</label>${pick('fTz', TZP, tzOf(p))}<div class="coord" id="fKst"></div></div>
       <div class="f"><label>장소 연결</label><select class="in" id="fPlace">${opts}</select></div>
       <div class="f"><label>메모</label><textarea class="in" id="fMemo" placeholder="예약 시간, 준비물 등">${esc(p.memo)}</textarea></div>`,
     foot: `${isNew ? '' : `<button class="btn big red" data-a="plan-del" data-id="${p.id}" style="flex:0 0 90px">삭제</button>`}<button class="btn big pri" data-a="sheet-ok">저장</button>`,
+    mount: () => {
+      const upd = () => { const k = inSeoul({ date: $('#fDate').value, time: $('#fTime').value, tz: pickVal('fTz') }); $('#fKst').textContent = k ? `→ ${k.replace('한국', '한국 시간')}` : ''; };
+      ['fDate', 'fTime'].forEach(i => $('#' + i).addEventListener('input', upd)); $('#fTz').addEventListener('click', () => setTimeout(upd)); upd();
+    },
     ok: () => {
       const title = $('#fTitle').value.trim(); if (!title) { toast('내용을 입력해주세요'); return false; }
-      Object.assign(p, { title, cat: pickVal('fCat'), date: $('#fDate').value, time: $('#fTime').value, placeId: $('#fPlace').value, memo: $('#fMemo').value.trim() });
-      ui.lastPlanDate = p.date;
+      Object.assign(p, { title, cat: pickVal('fCat'), date: $('#fDate').value, time: $('#fTime').value, tz: pickVal('fTz'), placeId: $('#fPlace').value, memo: $('#fMemo').value.trim() });
+      ui.lastPlanDate = p.date; ui.lastTz = p.tz;
+      if (map) updateRoute();
       upsert('plans', p); toast(isNew ? '일정을 추가했어요' : '저장했어요');
     },
   });
@@ -332,7 +382,7 @@ async function importExcel(file) {
   if (hi < 0) { toast('"할 일" 칸이 있는 양식이 아니에요'); return; }
   const H = rows[hi].map(norm);
   const col = (...names) => H.findIndex(h => names.includes(h));
-  const C = { date: col('날짜'), time: col('시간', '시작', '시작시간'), end: col('끝', '종료', '끝시간', '종료시간'), title: col('할일', '일정', '제목'), kind: col('종류'), place: col('장소'), memo: col('메모'), cost: col('비용'), cur: col('통화') };
+  const C = { tz: col('기준시간', '시간대', '기준'), date: col('날짜'), time: col('시간', '시작', '시작시간'), end: col('끝', '종료', '끝시간', '종료시간'), title: col('할일', '일정', '제목'), kind: col('종류'), place: col('장소'), memo: col('메모'), cost: col('비용'), cur: col('통화') };
   let added = 0, dup = 0, newPlaces = 0, filled = 0;
   for (const r of rows.slice(hi + 1)) {
     const get = i => (i >= 0 ? r[i] : '');
@@ -340,7 +390,7 @@ async function importExcel(file) {
     if (!title || /\(예시\)/.test(title)) continue;
     const end = xlTime(get(C.end)), cost = num(get(C.cost)), cur = ['USD', 'CAD', 'KRW'].includes(String(get(C.cur)).trim()) ? String(get(C.cur)).trim() : 'USD';
     const memo = [end ? '~' + end : '', cost ? fmtCur(cost, cur) : '', String(get(C.memo)).trim()].filter(Boolean).join(' · ');
-    const p = { id: uid(), date: xlDate(get(C.date)), time: xlTime(get(C.time)), title, cat: kindKey(get(C.kind)), placeId: '', memo, done: false };
+    const p = { id: uid(), date: xlDate(get(C.date)), time: xlTime(get(C.time)), title, cat: kindKey(get(C.kind)), placeId: '', memo, done: false, tz: tzFromText(get(C.tz)) || S.settings.tz };
     if (S.plans.some(x => x.title === p.title && (x.date || '') === p.date && (x.time || '') === p.time)) { dup++; continue; }
     const pn = String(get(C.place)).trim();
     if (pn) {
@@ -784,6 +834,7 @@ function settingsSheet() {
       <div class="f two"><div><label>1달러 = 원</label><input class="in" inputmode="decimal" data-rate="USD" value="${esc(st.rates.USD)}"></div><div><label>1캐나다달러 = 원</label><input class="in" inputmode="decimal" data-rate="CAD" value="${esc(st.rates.CAD)}"></div></div>
       ${S.budget.length ? '' : `<div class="f"><label>총 예산 (원) · 경비 → 예산 짜기에서 항목별로도 짤 수 있어요</label><input class="in" inputmode="numeric" data-set="budget" value="${st.budget || ''}" placeholder="예: 2000000"></div>`}
       <div class="f"><label>기능 켜기·끄기·순서 <span style="font-weight:400">(앞의 4개가 아래 탭에 나와요)</span></label><div class="list" id="modList" style="background:var(--card2)">${modRows()}</div></div>
+      <div class="f"><label>여행지 기본 시간대 (새 일정에 쓰여요)</label>${pick('setTz', Object.fromEntries(Object.entries(TZS).map(([k, v]) => [k, { n: `${v.n} ${v.s}` }])), st.tz)}</div>
       <div class="f"><label>화면</label><div class="seg">${[['auto', '자동'], ['light', '라이트'], ['dark', '다크']].map(([k, n]) => `<button class="${st.theme === k ? 'on' : ''}" data-a="theme" data-k="${k}">${n}</button>`).join('')}</div></div>
       <div class="f"><label>데이터</label><div class="btns" style="margin-top:0"><button class="btn" data-a="export">백업 내보내기</button><button class="btn" data-a="import">백업 불러오기</button></div>
         <div class="coord">백업 파일엔 사진이 빠져요. 사진은 폰 갤러리에 원본이 남아 있어요.</div>
@@ -867,8 +918,13 @@ async function ensureMap() {
   try { st = await getOnlineStyle(); mapStyleKind = 'online'; } catch (e) { st = localStyle(); mapStyleKind = 'local'; }
   map = new maplibregl.Map({ container: 'mapEl', style: st, center: [-112, 37], zoom: 1.7, attributionControl: { compact: true }, maxPitch: 60 });
   map.on('load', () => { drawMarkers(); const pts = placesWithLoc(); if (pts.length) setTimeout(() => fitAll(), 600); });
+  map.on('style.load', () => { addRouteLayers(); updateRoute(); });
   map.on('click', async e => {
-    if (!pinMode) { hideMcard(); return; }
+    if (!pinMode) {
+      const hit = map.getLayer('route-hit') && S.settings.showRoute ? map.queryRenderedFeatures(e.point, { layers: ['route-hit'] }) : [];
+      if (hit.length) { routeSheet(hit[0].properties.pid); return; }
+      hideMcard(); return;
+    }
     const { lat, lng } = e.lngLat;
     setPinMode(false);
     const d = pending || { id: uid(), name: '', cat: 'food', status: 'want', lat: '', lng: '', address: '', memo: '', date: '', url: '', rating: 0 };
@@ -883,6 +939,66 @@ async function ensureMap() {
   });
   if (mapStyleKind === 'local') toast('오프라인 지구본으로 보여요 (인터넷 연결 시 상세 지도)');
 }
+/* route arrows: places linked to dated plans, in time order */
+function routeSegments() {
+  const hasLoc = pl => pl && pl.lat !== '' && pl.lat != null && isFinite(pl.lat);
+  const steps = S.plans.filter(p => p.date && p.placeId && hasLoc(byId('places', p.placeId)))
+    .sort(planSort);
+  const segs = [];
+  for (let i = 1; i < steps.length; i++) {
+    const a = byId('places', steps[i - 1].placeId), b = byId('places', steps[i].placeId);
+    if (a.id === b.id) continue;
+    const done = typeof steps[i].moved === 'boolean' ? steps[i].moved : !!steps[i - 1].done;
+    segs.push({ from: a, to: b, plan: steps[i], prev: steps[i - 1], done });
+  }
+  return segs;
+}
+function routeGeo() {
+  return {
+    type: 'FeatureCollection', features: routeSegments().map((g, i) => {
+      // slight arc so back-and-forth trips don't overlap
+      const [x1, y1, x2, y2] = [+g.from.lng, +g.from.lat, +g.to.lng, +g.to.lat];
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, dx = x2 - x1, dy = y2 - y1, k = 0.12;
+      const cx = mx - dy * k, cy = my + dx * k, pts = [];
+      for (let t = 0; t <= 1.0001; t += 1 / 24) pts.push([(1 - t) * (1 - t) * x1 + 2 * (1 - t) * t * cx + t * t * x2, (1 - t) * (1 - t) * y1 + 2 * (1 - t) * t * cy + t * t * y2]);
+      return { type: 'Feature', properties: { i, done: g.done ? 1 : 0, pid: g.plan.id }, geometry: { type: 'LineString', coordinates: pts } };
+    }),
+  };
+}
+function arrowImage() {
+  const n = 48, c = document.createElement('canvas'); c.width = c.height = n; const x = c.getContext('2d');
+  x.fillStyle = '#000'; x.beginPath(); x.moveTo(n * 0.78, n / 2); x.lineTo(n * 0.28, n * 0.2); x.lineTo(n * 0.4, n / 2); x.lineTo(n * 0.28, n * 0.8); x.closePath(); x.fill();
+  return x.getImageData(0, 0, n, n);
+}
+function addRouteLayers() {
+  if (!map || map.getSource('route')) return;
+  if (!map.hasImage('arrow')) map.addImage('arrow', arrowImage(), { sdf: true, pixelRatio: 2 });
+  const vis = S.settings.showRoute ? 'visible' : 'none';
+  map.addSource('route', { type: 'geojson', data: routeGeo() });
+  map.addLayer({ id: 'route-todo', type: 'line', source: 'route', filter: ['==', ['get', 'done'], 0], layout: { 'line-cap': 'round', visibility: vis }, paint: { 'line-color': '#3182F6', 'line-opacity': 0.45, 'line-width': 2.5, 'line-dasharray': [2, 2] } });
+  map.addLayer({ id: 'route-done', type: 'line', source: 'route', filter: ['==', ['get', 'done'], 1], layout: { 'line-cap': 'round', 'line-join': 'round', visibility: vis }, paint: { 'line-color': '#1B64DA', 'line-width': 4.5 } });
+  map.addLayer({ id: 'route-arrow', type: 'symbol', source: 'route', layout: { visibility: vis, 'symbol-placement': 'line', 'symbol-spacing': 90, 'icon-image': 'arrow', 'icon-size': ['case', ['==', ['get', 'done'], 1], 1, 0.8], 'icon-allow-overlap': true, 'icon-rotation-alignment': 'map' }, paint: { 'icon-color': ['case', ['==', ['get', 'done'], 1], '#1B64DA', '#7FB0F8'] } });
+  map.addLayer({ id: 'route-hit', type: 'line', source: 'route', layout: { visibility: vis }, paint: { 'line-color': '#000', 'line-opacity': 0.001, 'line-width': 22 } });
+}
+function updateRoute() {
+  if (!map) return;
+  const src = map.getSource('route');
+  if (src) src.setData(routeGeo()); else if (map.isStyleLoaded()) addRouteLayers();
+  const b = $('#routeBtn'); if (b) b.classList.toggle('on', !!S.settings.showRoute);
+}
+function routeSheet(pid) {
+  const seg = routeSegments().find(g => g.plan.id === pid); if (!seg) return;
+  const p = seg.plan, q = seg.prev, ks = inSeoul(p);
+  sheet({
+    title: `${seg.from.name} → ${seg.to.name}`,
+    body: `<div class="row" style="gap:6px">${tag(seg.done ? '이동 완료' : '아직', seg.done ? '#1B64DA' : '#8B95A1')}</div>
+      <div class="f"><label>출발 일정</label><div style="font-weight:600">${esc(q.title)}</div><div class="sub" style="margin-top:4px">${fmtD(q.date)}${q.time ? ` · ${q.time} ${TZS[tzOf(q)].n} 시간` : ''}</div></div>
+      <div class="f"><label>도착 일정</label><div style="font-weight:600">${esc(p.title)}</div><div class="sub" style="margin-top:4px">${fmtD(p.date)}${p.time ? ` · ${p.time} ${TZS[tzOf(p)].n} 시간` : ''}${ks ? ` (${ks})` : ''}</div></div>
+      <div class="coord" style="margin-top:14px;line-height:1.5">출발 일정을 체크하면 자동으로 진해져요. 여기서 직접 바꿀 수도 있어요</div>`,
+    foot: `<button class="btn big" data-a="route-plan" data-id="${p.id}">일정 보기</button><button class="btn big pri" data-a="route-done" data-id="${p.id}" data-v="${seg.done ? 0 : 1}">${seg.done ? '완료 취소' : '이동 완료로 표시'}</button>`,
+  });
+}
+
 const placesWithLoc = () => S.places.filter(p => p.lat !== '' && p.lat != null && isFinite(p.lat));
 function renderMapChips() {
   const cats = Object.keys(CATS).filter(k => S.places.some(p => p.cat === k));
@@ -891,6 +1007,7 @@ function renderMapChips() {
 }
 function drawMarkers() {
   if (!map) return;
+  updateRoute();
   markers.forEach(m => m.remove()); markers = [];
   placesWithLoc().filter(p => ui.mapCat === 'all' || p.cat === ui.mapCat).forEach(p => {
     const c = CATS[p.cat] || CATS.etc;
@@ -1012,14 +1129,17 @@ const A = {
   settings: () => settingsSheet(),
   'sheet-close': () => closeSheet(),
   'sheet-ok': () => { const o = sheets[sheets.length - 1]; if (o && o.ok && o.ok() === false) return; closeSheet(); },
-  pick: el => { $$('button', el.parentNode).forEach(b => b.classList.toggle('on', b === el)); },
+  pick: el => { $$('button', el.parentNode).forEach(b => b.classList.toggle('on', b === el)); if (el.parentNode.id === 'setTz') { S.settings.tz = el.dataset.k; save(); render(); } },
   rate: el => { const n = +el.dataset.n, cur = $$('#fRate button.on').length; $$('#fRate button').forEach((b, i) => b.classList.toggle('on', cur !== n && i < n)); },
   copy: el => copyText(el.dataset.t),
   url: el => openURL(el.dataset.u),
   // plans
   'plan-add': () => planForm(),
   'plan-edit': el => planForm(byId('plans', el.dataset.id)),
-  'plan-done': el => { const p = byId('plans', el.dataset.id); p.done = !p.done; save(); render(); },
+  'plan-done': el => { const p = byId('plans', el.dataset.id); p.done = !p.done; save(); render(); if (map) updateRoute(); },
+  'route-done': el => { const p = byId('plans', el.dataset.id); p.moved = el.dataset.v === '1'; save(); closeSheet(); updateRoute(); toast(p.moved ? '이 구간을 완료했어요' : '완료를 취소했어요'); },
+  'route-plan': el => { closeSheet(); planForm(byId('plans', el.dataset.id)); },
+  'map-route': () => { S.settings.showRoute = !S.settings.showRoute; save(); if (map) ['route-todo', 'route-done', 'route-arrow', 'route-hit'].forEach(l => map.getLayer(l) && map.setLayoutProperty(l, 'visibility', S.settings.showRoute ? 'visible' : 'none')); updateRoute(); toast(S.settings.showRoute ? '이동 경로 표시' : '이동 경로 숨김'); },
   'plan-del': el => confirmSheet('일정을 삭제할까요?', '되돌릴 수 없어요', '삭제', () => { S.plans = S.plans.filter(x => x.id !== el.dataset.id); save(); closeSheet(); render(); }),
   // places
   pcat: el => { ui.placeCat = el.dataset.k; render(); },
