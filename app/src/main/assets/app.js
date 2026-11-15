@@ -124,6 +124,82 @@ function tzFromText(v) {
   return '';
 }
 
+/* ============ regions (timetable colors by where I am) ============ */
+const RCOLORS = ['#F2668B', '#E8930C', '#0B8FD0', '#7B61FF', '#2E3A87', '#00876F', '#D93838', '#C0874F', '#00A3A3', '#8E44AD', '#4E5968', '#E84393'];
+function defaultRegions() {
+  const L = 'America/Los_Angeles';
+  return [
+    { id: 'rg-kr', name: '한국', tz: 'Asia/Seoul', color: '#F2668B', from: '', to: '' },
+    { id: 'rg-sf', name: '샌프란시스코', tz: L, color: '#E8930C', from: '2026-12-26', to: '' },
+    { id: 'rg-la', name: 'LA', tz: L, color: '#0B8FD0', from: '', to: '' },
+    { id: 'rg-lv', name: '라스베이거스', tz: L, color: '#7B61FF', from: '2027-01-06', to: '2027-01-10' },
+    { id: 'rg-ny', name: '뉴욕', tz: 'America/New_York', color: '#2E3A87', from: '', to: '' },
+    { id: 'rg-ro', name: '로마', tz: 'Europe/Rome', color: '#00876F', from: '', to: '' },
+    { id: 'rg-sh', name: '상하이', tz: 'Asia/Shanghai', color: '#D93838', from: '', to: '' },
+  ];
+}
+// region for a (local date, time zone): same time zone, date inside its range; the latest start wins
+function regionOf(date, tz) {
+  let best = null;
+  for (const r of S.regions || []) {
+    if (r.tz && r.tz !== tz) continue;
+    if (r.from && date < r.from) continue;
+    if (r.to && date > r.to) continue;
+    if (!best || (r.from || '') > (best.from || '')) best = r;
+  }
+  return best;
+}
+const regionColor = (date, tz) => { const r = date && regionOf(date, tz); return r ? r.color : '#8B95A1'; };
+function regionRows() {
+  return `<div class="list" style="background:var(--card2)">${(S.regions || []).map((r, i) => `<div class="li" data-a="rg-edit" data-i="${i}" style="padding:11px 14px">
+    <span style="width:22px;height:22px;border-radius:7px;background:${r.color};flex:none"></span>
+    <div class="m"><div class="t" style="font-size:15px">${esc(r.name)}</div><div class="d">${[TZS[r.tz] ? TZS[r.tz].n + ' ' + TZS[r.tz].s : '시간대 무관', r.from || r.to ? `${r.from ? fmtDs(r.from) : '…'} – ${r.to ? fmtDs(r.to) : '…'}` : '날짜 없음'].join(' · ')}</div></div>
+    <span class="chev">${ico('chev', 'i s')}</span></div>`).join('') || '<div class="empty" style="padding:18px">지역이 없어요</div>'}</div>`;
+}
+function regionsSheet() {
+  sheet({
+    title: '지역 · 일정표 색',
+    body: `<div class="sub" style="line-height:1.55;margin-bottom:12px">그날 내가 있는 지역 색으로 일정표가 칠해져요. 같은 시간대(SF·LA·베가스)는 날짜로 구분해요 — 기간이 겹치면 늦게 시작한 지역이 우선이에요.</div><div id="rgList">${regionRows()}</div>`,
+    foot: `<button class="btn big pri" data-a="rg-add">${ico('plus', 'i s')}지역 추가</button>`,
+  });
+}
+function regionForm(i) {
+  const isNew = i == null;
+  const r = isNew ? { id: uid(), name: '', tz: S.settings.tz, color: RCOLORS[(S.regions || []).length % RCOLORS.length], from: '', to: '' } : { ...S.regions[i] };
+  const TZP = Object.fromEntries(Object.entries(TZS).map(([k, v]) => [k, { n: `${v.n} ${v.s}` }]));
+  sheet({
+    title: isNew ? '지역 추가' : '지역 수정',
+    body: `<div class="f"><label>이름</label><input class="in" id="rName" value="${esc(r.name)}" placeholder="예: 샌프란시스코"></div>
+      <div class="f"><label>색</label><div class="pick" id="rColor">${RCOLORS.map(c => `<button data-a="pick" data-k="${c}" class="${c === r.color ? 'on' : ''}" style="width:40px;height:40px;padding:0;justify-content:center"><span style="width:24px;height:24px;border-radius:8px;background:${c}"></span></button>`).join('')}</div>
+        <div class="row" style="margin-top:8px"><span class="sub">직접 입력</span><input class="in" id="rHex" value="${RCOLORS.includes(r.color) ? '' : esc(r.color)}" placeholder="#FF8800" style="height:42px;flex:1"></div></div>
+      <div class="f"><label>시간대</label>${pick('rTz', TZP, r.tz)}</div>
+      <div class="f two"><div><label>머무는 첫날 (선택)</label><input class="in" type="date" id="rFrom" value="${esc(r.from)}"></div><div><label>마지막 날 (선택)</label><input class="in" type="date" id="rTo" value="${esc(r.to)}"></div></div>
+      <div class="coord" style="line-height:1.5">날짜를 비우면 그 시간대의 모든 날에 쓰여요</div>`,
+    foot: `${isNew ? '' : `<button class="btn big red" data-a="rg-del" data-i="${i}" style="flex:0 0 90px">삭제</button>`}<button class="btn big pri" data-a="sheet-ok">저장</button>`,
+    ok: () => {
+      const name = $('#rName').value.trim(); if (!name) { toast('이름을 입력해주세요'); return false; }
+      const hex = $('#rHex').value.trim();
+      Object.assign(r, { name, color: /^#[0-9a-f]{6}$/i.test(hex) ? hex : pickVal('rColor') || r.color, tz: pickVal('rTz'), from: $('#rFrom').value, to: $('#rTo').value });
+      if (isNew) S.regions.push(r); else S.regions[i] = r;
+      save(); render(); const el = $('#rgList'); if (el) setTimeout(() => { const e2 = $('#rgList'); if (e2) e2.innerHTML = regionRows(); });
+    },
+  });
+}
+
+/* ============ repeating plans ============ */
+const addDays = (d, n) => dstr(new Date(parseD(d).getTime() + n * 864e5));
+// expand daily-repeating plans into one entry per day (entries keep the series id)
+function expandPlans() {
+  const out = [];
+  for (const p of S.plans) {
+    if (p.rep && p.rep.until && p.date && p.rep.until > p.date && !isTrip(p)) {
+      const n = Math.min(diffDays(p.date, p.rep.until), 120);
+      for (let i = 0; i <= n; i++) { const d = addDays(p.date, i); out.push({ ...p, date: d, done: !!(p.doneOn || {})[d], _src: p, _i: i }); }
+    } else out.push(p);
+  }
+  return out;
+}
+
 /* ============ state ============ */
 const KEY = 'trip.v1';
 let S;
@@ -131,7 +207,7 @@ function seed() {
   const lvcc = uid(), union = uid();
   return {
     v: 1,
-    settings: { title: '미국 여행', route: 'SF · LA · 라스베이거스 · 뉴욕 · 로마 · 상하이', start: '', end: '', rates: { USD: 1340, CAD: 970 }, curs: ['USD', 'CAD', 'EUR', 'CNY'], customCur: {}, ratesAt: '', budget: 0, theme: 'auto', cur: 'USD', tz: 'America/Los_Angeles', showRoute: true },
+    settings: { title: '미국 여행', route: 'SF · LA · 라스베이거스 · 뉴욕 · 로마 · 상하이', start: '', end: '', rates: { USD: 1340, CAD: 970 }, curs: ['USD', 'EUR', 'CNY'], customCur: {}, ratesAt: '', budget: 0, theme: 'auto', cur: 'USD', tz: 'America/Los_Angeles', showRoute: true },
     modules: ['plan', 'map', 'place', 'money', 'photo', 'book'].map(k => ({ k, on: true })),
     places: [
       { id: union, name: 'LA 유니언역 (플릭스버스)', cat: 'move', status: 'want', lat: 34.0562, lng: -118.2365, address: '800 N Alameda St, Los Angeles, CA', memo: '라스베이거스행 플릭스버스 출발지', date: '', url: '', rating: 0 },
@@ -142,7 +218,7 @@ function seed() {
       ...[6, 7, 8, 9].map((d, i) => ({ id: uid(), date: `2027-01-${pad(d)}`, time: '', title: `CES 근무 ${i + 1}일차`, cat: 'work', placeId: lvcc, memo: '', done: false })),
       { id: uid(), date: '2027-01-10', time: '', title: '체크아웃 → 캐나다 이동', cat: 'move', placeId: '', memo: '', done: false },
     ],
-    bookings: [], expenses: [], photos: [], budget: [], maps: [],
+    bookings: [], expenses: [], photos: [], budget: [], maps: [], regions: defaultRegions(),
   };
 }
 function load() {
@@ -152,6 +228,12 @@ function load() {
   S.settings = Object.assign({}, d.settings, S.settings);
   S.settings.rates = Object.assign({}, d.settings.rates, S.settings.rates);
   if (!Array.isArray(S.settings.curs)) S.settings.curs = ['USD', 'CAD'];
+  if (!Array.isArray(S.regions)) S.regions = defaultRegions();
+  if (!S.settings.m3) { // money: KRW · USD · EUR(이탈리아) · CNY(중국)
+    const used = c => S.expenses.some(e => e.cur === c) || S.budget.some(b => b.cur === c);
+    S.settings.curs = ['USD', 'EUR', 'CNY', ...(S.settings.curs || []).filter(c => !['USD', 'EUR', 'CNY'].includes(c) && used(c))];
+    S.settings.m3 = true;
+  }
   if (!S.settings.m2) { // route & currencies for SF·LA·Vegas·NYC·Rome·Shanghai
     if (S.settings.route === 'LA · 라스베이거스 · 캐나다') S.settings.route = d.settings.route;
     for (const c of ['EUR', 'CNY']) if (!S.settings.curs.includes(c)) S.settings.curs.push(c);
@@ -305,7 +387,7 @@ function vHome() {
   if (stats.length) h += `<div class="stats" style="grid-template-columns:repeat(${stats.length},1fr)">${stats.map(s => `<button class="stat" data-a="tab" data-k="${s[0]}" style="text-align:left"><div class="sub">${s[1]}</div><div class="v">${s[2]}</div></button>`).join('')}</div>`;
 
   if (en.includes('plan')) {
-    const up = S.plans.filter(p => p.date && p.date >= t && !p.done).sort(planSort).slice(0, 3);
+    const up = expandPlans().filter(p => p.date && p.date >= t && !p.done).sort(planSort).slice(0, 3);
     const und = S.plans.filter(p => !p.date && !p.done);
     const list = up.length ? up : und.slice(0, 3);
     h += `<div class="lbl">${up.length ? '다가오는 일정' : '아직 날짜 없는 일정'}</div>`;
@@ -359,8 +441,9 @@ function planLi(p, withDate) {
     sub = [withDate && p.date ? fmtD(p.date) : '', p.mv.no, p.title === rt ? '' : rt, t.arr, t.dur, p.memo].filter(Boolean).join(' · ');
   }
   const ks = inSeoul(p);
+  if (p._src) sub = [`매일 ${p._i + 1}/${diffDays(p._src.date, p._src.rep.until) + 1}일차`, sub].filter(Boolean).join(' · ');
   return `<div class="li ${p.done ? 'done' : ''}" data-a="plan-edit" data-id="${p.id}">
-    <button class="chk ${p.done ? 'on' : ''}" data-a="plan-done" data-id="${p.id}">${p.done ? ico('check', 'i s') : ''}</button>
+    <button class="chk ${p.done ? 'on' : ''}" data-a="plan-done" data-id="${p.id}" data-d="${p._src ? p.date : ''}">${p.done ? ico('check', 'i s') : ''}</button>
     ${p.time ? `<div class="time">${esc(p.time)}<span class="tz">${TZS[tzOf(p)].s}</span></div>` : ''}
     <div class="m"><div class="t">${esc(p.title)}</div>${sub ? `<div class="d">${esc(sub)}</div>` : ''}${ks ? `<div class="d kst">${ks}</div>` : ''}</div>
     ${isTrip(p) && p.mv.mode ? tag(MODES[p.mv.mode].n, c.c) : tag(c.n, c.c)}</div>`;
@@ -371,17 +454,18 @@ function vPlan() {
   let h = hd('일정', `<button class="ib" data-a="xl-import" title="엑셀로 가져오기">${ico('import')}</button>`) + planSeg();
   if (!S.plans.length) return h + `<div class="sec">${empty('일정이 비어 있어요', '+ 버튼으로 첫 일정을 넣어보세요')}</div>` + fab('plan-add');
   const groups = {};
-  [...S.plans].sort(planSort).forEach(p => (groups[p.date || ''] ||= []).push(p));
+  expandPlans().sort(planSort).forEach(p => (groups[p.date || ''] ||= []).push(p));
   const t = todayStr();
   for (const [d, arr] of Object.entries(groups)) {
     const dn = d ? dayNum(d) : null;
-    const zs = [...new Set(arr.flatMap(p => isTrip(p) && p.mv.arrTz ? [tzOf(p), p.mv.arrTz] : [tzOf(p)]))].map(z => TZS[z].n + ' 시간').join(' → ');
+    const zs = [...new Set(arr.flatMap(p => isTrip(p) && p.mv.arrTz ? [tzOf(p), p.mv.arrTz] : [tzOf(p)]))].map(z => { const r = d && regionOf(d, z); return r ? `<i style="background:${r.color}"></i>${esc(r.name)} ${TZS[z].s}` : `${TZS[z].n} 시간`; }).join(' → ');
     h += `<div class="day"><span class="n">${d ? fmtD(d) : '날짜 미정'}</span>${dn && dn > 0 ? `<span class="s">Day ${dn}</span>` : ''}${d === t ? '<span class="today">오늘</span>' : ''}${d ? `<span class="zone">${zs}</span>` : ''}</div>
       <div class="sec" style="margin-top:0"><div class="list">${arr.map(p => planLi(p)).join('')}</div></div>`;
   }
   return h + fab('plan-add');
 }
 function planForm(p, preset) {
+  if (p && p._src) p = p._src;
   const isNew = !p;
   p = p ? { ...p } : Object.assign({ id: uid(), date: ui.lastPlanDate || '', time: '', end: '', title: '', cat: 'see', placeId: '', memo: '', done: false, tz: ui.lastTz || S.settings.tz }, preset || {});
   const TZP = Object.fromEntries(Object.entries(TZS).map(([k, v]) => [k, { n: `${v.n} ${v.s}` }]));
@@ -403,6 +487,9 @@ function planForm(p, preset) {
         <div class="coord" style="line-height:1.5">공항·정류장은 장소 탭 → '공항·정류장'에서 관리해요. 고르면 그곳 시간대가 자동으로 맞춰지고, 지도에 화살표로 이어져요</div>
       </div>
       <div class="f" id="plBox"><label>장소 연결</label><select class="in" id="fPlace">${opts}</select></div>
+      <div class="f" id="repBox"><label>반복</label>${pick('fRep', { no: { n: '안 함' }, daily: { n: '매일 반복' } }, p.rep ? 'daily' : 'no')}
+        <div id="repUntil" style="margin-top:8px;display:${p.rep ? '' : 'none'}"><div class="two"><div class="sub" style="align-self:center">언제까지</div><input class="in" type="date" id="fUntil" value="${esc(p.rep ? p.rep.until : '')}"></div>
+        <div class="coord" style="line-height:1.5">CES 근무, 숙소처럼 매일 같은 시간에 하는 것. 하루씩 따로 체크할 수 있고, 수정하면 전체가 바뀌어요. 숙소는 시간을 비우면 '시간 미정' 줄에 매일 떠요</div></div></div>
       <div class="f"><label>메모</label><textarea class="in" id="fMemo" placeholder="예약 시간, 준비물 등">${esc(p.memo)}</textarea></div>`,
     foot: `${isNew ? '' : `<button class="btn big red" data-a="plan-del" data-id="${p.id}" style="flex:0 0 90px">삭제</button>`}<button class="btn big pri" data-a="sheet-ok">저장</button>`,
     mount: () => {
@@ -410,7 +497,8 @@ function planForm(p, preset) {
         const tr = ['move', 'flight'].includes(pickVal('fCat'));
         $('#mvBox').style.display = tr ? '' : 'none'; $('#plBox').style.display = tr ? 'none' : '';
         $('#fTzLbl').textContent = tr ? '출발 시간은 어디 기준?' : '어디 시간 기준?';
-        $('#endBox').style.visibility = tr ? 'hidden' : ''; $('#fTimeLbl').textContent = tr ? '출발 시간' : '시작'; $('#fDateLbl').textContent = tr ? '출발 날짜' : '날짜';
+        $('#endBox').style.visibility = tr ? 'hidden' : ''; $('#repBox').style.display = tr ? 'none' : '';
+        $('#repUntil').style.display = pickVal('fRep') === 'daily' ? '' : 'none'; $('#fTimeLbl').textContent = tr ? '출발 시간' : '시작'; $('#fDateLbl').textContent = tr ? '출발 날짜' : '날짜';
         $('#fTitle').placeholder = tr ? '비우면 "출발지 → 도착지"로 들어가요' : '예: 인앤아웃 점심';
         const k = inSeoul({ date: $('#fDate').value, time: $('#fTime').value, tz: pickVal('fTz') }); $('#fKst').textContent = k ? `→ ${k.replace('한국', '한국 시간')}` : '';
         const ad = fixArrDate($('#fDate').value, $('#fTime').value, pickVal('fTz'), $('#fArrDate').value, $('#fArrTime').value, pickVal('fArrTz'));
@@ -420,7 +508,7 @@ function planForm(p, preset) {
         $('#fDur').textContent = [t.dur ? `걸리는 시간 ${t.dur}` : '', ak ? `도착 ${ak.replace('한국', '한국 시간')}` : ''].filter(Boolean).join(' · ');
       };
       ['fDate', 'fTime', 'fArrDate', 'fArrTime'].forEach(i => $('#' + i).addEventListener('input', upd));
-      ['fTz', 'fArrTz', 'fCat'].forEach(i => $('#' + i).addEventListener('click', () => setTimeout(upd)));
+      ['fTz', 'fArrTz', 'fCat', 'fRep'].forEach(i => $('#' + i).addEventListener('click', () => setTimeout(upd)));
       const setMode = k => $$('#fMode button').forEach(b => b.classList.toggle('on', b.dataset.k === k));
       $('#fCat').addEventListener('click', () => setTimeout(() => { const c = pickVal('fCat'), m = pickVal('fMode'); if (c === 'flight' && m !== 'flight') setMode('flight'); if (c === 'move' && m === 'flight') setMode('bus'); }));
       $('#fMode').addEventListener('click', () => setTimeout(() => { const m = pickVal('fMode'); if (m === 'flight' && pickVal('fCat') === 'move') $$('#fCat button').forEach(b => b.classList.toggle('on', b.dataset.k === 'flight')); }));
@@ -450,6 +538,11 @@ function planForm(p, preset) {
         p.placeId = p.mv.from || p.mv.to || '';
       } else { delete p.mv; }
       if (!title) { toast('내용을 입력해주세요'); return false; }
+      if (!tr && pickVal('fRep') === 'daily') {
+        const u = $('#fUntil').value;
+        if (!$('#fDate').value || !u || u <= $('#fDate').value) { toast('날짜와 반복 마지막 날을 확인해주세요'); return false; }
+        p.rep = { until: u };
+      } else delete p.rep;
       Object.assign(p, { title, cat: pickVal('fCat'), date: $('#fDate').value, time: $('#fTime').value, tz: pickVal('fTz'), placeId: tr ? p.placeId : $('#fPlace').value, end: tr ? '' : $('#fEnd').value, memo: $('#fMemo').value.trim() });
       ui.lastPlanDate = p.date; ui.lastTz = p.tz;
       if (map) updateRoute();
@@ -612,11 +705,12 @@ const fmtM = m => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
 const DAYC = ['#F2668B', '#2E3A87', '#00876F', '#E8930C', '#7B61FF', '#0B8FD0'];
 function ttColumns() {
   const cols = new Map();
-  const add = (date, tz) => { const k = date + '|' + tz; if (!cols.has(k)) cols.set(k, { date, tz, items: [], allday: [], marks: [] }); return cols.get(k); };
-  for (const p of S.plans) {
+  const add = (date, tz) => { const k = date + '|' + tz; if (!cols.has(k)) cols.set(k, { date, tz, items: [], allday: [], marks: [], carry: [] }); return cols.get(k); };
+  for (const p of expandPlans()) {
     if (!p.date) continue;
     const c = add(p.date, tzOf(p));
     (p.time ? c.items : c.allday).push(p);
+    if (p.time && p.end && !isTrip(p) && toMin(p.end) < toMin(p.time) && toMin(p.end) > TT_S) add(addDays(p.date, 1), tzOf(p)).carry.push(p);
     if (isTrip(p) && p.mv.arrTime && p.mv.arrDate && !(p.mv.arrDate === p.date && (p.mv.arrTz || tzOf(p)) === tzOf(p))) add(p.mv.arrDate, p.mv.arrTz || tzOf(p)).marks.push(p);
   }
   const { start, end } = tripRange();
@@ -640,7 +734,10 @@ function layoutLanes(blocks) {
 }
 function vTable() {
   const cols = ttColumns(), ed = !!ui.ttEdit;
-  let h = hd('일정', `<button class="chip ${ed ? 'on' : ''}" data-a="tt-edit" style="padding:9px 15px">${ed ? '완료' : '편집'}</button>`) + planSeg();
+  const byRegion = S.settings.ttColor !== 'cat';
+  let h = hd('일정', `<button class="chip" data-a="regions" style="padding:9px 13px;margin-right:6px">지역</button><button class="chip ${ed ? 'on' : ''}" data-a="tt-edit" style="padding:9px 15px">${ed ? '완료' : '편집'}</button>`) + planSeg();
+  h += `<div class="chips" style="padding-top:8px"><span class="sub" style="align-self:center;margin-right:2px;white-space:nowrap;flex:none">블록 색</span>${[['region', '지역'], ['cat', '종류']].map(([k, n]) => `<button class="chip ${(byRegion ? 'region' : 'cat') === k ? 'on' : ''}" data-a="tt-color" data-k="${k}" style="padding:6px 12px">${n}</button>`).join('')}
+    ${(S.regions || []).map(r => `<span class="chip" style="padding:6px 10px;pointer-events:none"><span class="dot" style="background:${r.color}"></span>${esc(r.name)}</span>`).join('')}</div>`;
   if (!cols.length) return h + `<div class="sec">${empty('날짜가 있는 일정이 없어요', '일정에 날짜를 넣으면 일정표로 보여요')}</div>` + fab('plan-add');
   if (ed) h += `<div class="ttnote">블록을 끌어 시간·날짜를 옮기고, 아래 손잡이로 길이를 바꿔요 · 30분 단위 · 빈 칸을 누르면 새 일정</div>`;
   const dates = [...new Set(cols.map(c => c.date))];
@@ -649,32 +746,33 @@ function vTable() {
   for (let m = TT_S; m <= TT_E; m += 60) axis += `<div class="lab" style="top:${(m - TT_S) / 30 * TT_H}px">${m === TT_E ? '24:00' : fmtM(m)}</div>`;
   let body = '';
   cols.forEach((c, ci) => {
-    const color = DAYC[dates.indexOf(c.date) % DAYC.length], d = parseD(c.date), dn = dayNum(c.date);
+    const rg = regionOf(c.date, c.tz), color = rg ? rg.color : '#8B95A1', d = parseD(c.date), dn = dayNum(c.date);
     const blocks = layoutLanes([
       ...c.items.map(p => {
         const s = toMin(p.time); let e;
         if (isTrip(p) && p.mv.arrTime) e = (p.mv.arrDate === p.date && (p.mv.arrTz || tzOf(p)) === c.tz) ? toMin(p.mv.arrTime) : TT_E;
         else e = p.end ? toMin(p.end) : s + 60;
-        if (e <= s) e = Math.min(TT_E, s + 30);
+        if (e <= s) e = p.end && !isTrip(p) ? TT_E : Math.min(TT_E, s + 30);
         return { p, s, e, kind: 'item' };
       }),
       ...c.marks.map(p => { const s = toMin(p.mv.arrTime); return { p, s, e: s + 30, kind: 'mark' }; }),
+      ...c.carry.map(p => ({ p, s: TT_S, e: toMin(p.end), kind: 'carry' })),
     ]);
     const items = blocks.map(b => {
-      const c2 = (CATS[b.p.cat] || CATS.etc).c, s = Math.max(b.s, TT_S), e = Math.max(Math.min(b.e, TT_E), s + 30);
+      const c2 = byRegion ? color : (CATS[b.p.cat] || CATS.etc).c, s = Math.max(b.s, TT_S), e = Math.max(Math.min(b.e, TT_E), s + 30);
       const top = (s - TT_S) / 30 * TT_H, hgt = (e - s) / 30 * TT_H - 2, w = 100 / b.n;
       const tr = isTrip(b.p), ti = tr ? tripInfo(b.p) : null;
-      const label = b.kind === 'mark' ? `${esc(hubLabel(b.p.mv.to))} 도착` : esc(b.p.title);
-      const sub = b.kind === 'mark' ? `${b.p.mv.arrTime} · ${esc(hubLabel(b.p.mv.from))}에서` : `${b.s < TT_S ? '↑' : ''}${b.p.time}${b.p.end && !tr ? '–' + b.p.end : ''}${tr && b.p.mv.no ? ' · ' + esc(b.p.mv.no) : ''}${tr && ti.dur ? ' · ' + ti.dur : ''}`;
+      const label = b.kind === 'mark' ? `${esc(hubLabel(b.p.mv.to))} 도착` : b.kind === 'carry' ? `↓ ${esc(b.p.title)}` : esc(b.p.title);
+      const sub = b.kind === 'carry' ? `~${b.p.end}` : b.kind === 'mark' ? `${b.p.mv.arrTime} · ${esc(hubLabel(b.p.mv.from))}에서` : `${b.s < TT_S ? '↑' : ''}${b.p.time}${b.p.end && !tr ? '–' + b.p.end : ''}${tr && b.p.mv.no ? ' · ' + esc(b.p.mv.no) : ''}${tr && ti.dur ? ' · ' + ti.dur : ''}`;
       const canDrag = ed && b.kind === 'item';
-      return `<div class="blk ${b.p.done ? 'dn' : ''} ${canDrag ? 'drag' : ''} ${b.kind}" data-id="${b.p.id}" data-k="${b.kind}" style="top:${top}px;height:${hgt}px;left:calc(${b.lane * w}% + 2px);width:calc(${w}% - 4px);--c:${c2};--cb:${c2}29;--cm:${c2}14">
-        <b>${tr && b.kind === 'item' ? (b.p.mv.mode === 'flight' ? '✈ ' : '› ') : ''}${label}</b><span>${sub}</span>${canDrag && !tr ? '<i class="rz"></i>' : ''}</div>`;
+      return `<div class="blk ${b.p.done ? 'dn' : ''} ${canDrag ? 'drag' : ''} ${b.kind}" data-id="${b.p.id}" data-k="${b.kind}" data-d="${b.p._src ? b.p.date : ''}" style="top:${top}px;height:${hgt}px;left:calc(${b.lane * w}% + 2px);width:calc(${w}% - 4px);--c:${c2};--cb:${c2}29;--cm:${c2}14">
+        <b>${tr && b.kind === 'item' ? (b.p.mv.mode === 'flight' ? '✈ ' : '› ') : ''}${b.p._src ? '↻ ' : ''}${label}</b><span>${sub}</span>${canDrag && !tr ? '<i class="rz"></i>' : ''}</div>`;
     }).join('');
     let now = '';
     try { const q = tzParts(Date.now(), c.tz); const m = q.h * 60 + q.mi; if (`${q.y}-${pad(q.m)}-${pad(q.d)}` === c.date && m >= TT_S) now = `<div class="nowline" style="top:${(m - TT_S) / 30 * TT_H}px"></div>`; } catch (e) { }
-    const all = c.allday.length ? `<button class="tall" data-a="plan-edit" data-id="${c.allday[0].id}">${esc(c.allday[0].title)}${c.allday.length > 1 ? ` +${c.allday.length - 1}` : ''}</button>` : '';
+    const all = c.allday.length ? `<button class="tall" data-a="plan-edit" data-id="${c.allday[0].id}" style="background:${color}1F;color:${color}">${c.allday[0]._src ? '↻ ' : ''}${esc(c.allday[0].title)}${c.allday.length > 1 ? ` +${c.allday.length - 1}` : ''}</button>` : '';
     body += `<div class="tcol">
-      <div class="thead" style="--c:${color}"><b>${d.getMonth() + 1}월 ${d.getDate()}일 (${WD[d.getDay()]})</b><span class="${dupe(c.date) ? 'dup' : ''}">${TZS[c.tz].n} ${TZS[c.tz].s}${dn && dn > 0 ? ` · D${dn}` : ''}</span></div>
+      <div class="thead" style="--c:${color}"><b>${d.getMonth() + 1}월 ${d.getDate()}일 (${WD[d.getDay()]})</b><span class="${dupe(c.date) ? 'dup' : ''}">${rg ? esc(rg.name) : TZS[c.tz].n} ${TZS[c.tz].s}${dn && dn > 0 ? ` · D${dn}` : ''}</span></div>
       <div class="tallrow">${all}</div>
       <div class="tbody" data-ci="${ci}" style="height:${TT_N * TT_H}px">${items}${now}</div></div>`;
   });
@@ -732,7 +830,11 @@ function bindTable() {
       if (!moved) { planForm(p); return; }
       const start = TT_S + Math.round(parseFloat(blk.style.top) / TT_H) * 30;
       if (resize) { const e2 = toMin(p.time) + Math.round((parseFloat(blk.style.height) + 2) / TT_H) * 30; p.end = e2 >= TT_E ? '23:59' : fmtM(e2); }
-      else { const c = ui.ttCols[+blk.parentElement.dataset.ci]; shiftPlan(p, c.date, c.tz, start); }
+      else {
+        const c = ui.ttCols[+blk.parentElement.dataset.ci], od = blk.dataset.d;
+        if (od && p.rep) { const dd = diffDays(od, c.date); p.rep.until = addDays(p.rep.until, dd); shiftPlan(p, addDays(p.date, dd), c.tz, start); }
+        else shiftPlan(p, c.date, c.tz, start);
+      }
       save(); render(); if (map) updateRoute();
       toast(resize ? `${p.time}–${p.end}` : `${fmtD(p.date)} ${p.time} ${TZS[tzOf(p)].s}로 옮겼어요`);
     };
@@ -1175,6 +1277,7 @@ function settingsSheet() {
         <div class="coord" id="ratesAt">${st.ratesAt ? `마지막 자동 갱신 ${esc(st.ratesAt)}` : '인터넷 연결 시 버튼 한 번으로 오늘 환율이 들어가요'}</div></div>
       ${S.budget.length ? '' : `<div class="f"><label>총 예산 (원) · 경비 → 예산 짜기에서 항목별로도 짤 수 있어요</label><input class="in" inputmode="numeric" data-set="budget" value="${st.budget || ''}" placeholder="예: 2000000"></div>`}
       <div class="f"><label>기능 켜기·끄기·순서 <span style="font-weight:400">(앞의 4개가 아래 탭에 나와요)</span></label><div class="list" id="modList" style="background:var(--card2)">${modRows()}</div></div>
+      <div class="f"><label>지역 · 일정표 색</label><button class="btn" style="width:100%" data-a="regions">${(S.regions || []).map(r => `<span class="dot" style="background:${r.color}"></span>`).join('')}&nbsp;지역 ${(S.regions || []).length}개 관리</button></div>
       <div class="f"><label>여행지 기본 시간대 (새 일정에 쓰여요)</label>${pick('setTz', Object.fromEntries(Object.entries(TZS).map(([k, v]) => [k, { n: `${v.n} ${v.s}` }])), st.tz)}</div>
       <div class="f"><label>화면</label><div class="seg">${[['auto', '자동'], ['light', '라이트'], ['dark', '다크']].map(([k, n]) => `<button class="${st.theme === k ? 'on' : ''}" data-a="theme" data-k="${k}">${n}</button>`).join('')}</div></div>
       <div class="f"><label>데이터</label><div class="btns" style="margin-top:0"><button class="btn" data-a="export">백업 내보내기</button><button class="btn" data-a="import">백업 불러오기</button></div>
@@ -1330,7 +1433,7 @@ async function ensureMap() {
 function routeSegments() {
   const hasLoc = pl => pl && pl.lat !== '' && pl.lat != null && isFinite(pl.lat);
   const steps = [];
-  S.plans.filter(p => p.date).sort(planSort).forEach(p => {
+  expandPlans().filter(p => p.date).sort(planSort).forEach(p => {
     if (isTrip(p)) {
       const f = byId('places', p.mv.from), t = byId('places', p.mv.to);
       if (hasLoc(f)) steps.push({ pl: f, plan: p });
@@ -1545,7 +1648,11 @@ const A = {
   // plans
   'plan-add': () => planForm(),
   'plan-edit': el => planForm(byId('plans', el.dataset.id)),
-  'plan-done': el => { const p = byId('plans', el.dataset.id); p.done = !p.done; save(); render(); if (map) updateRoute(); },
+  'plan-done': el => {
+    const p = byId('plans', el.dataset.id), d = el.dataset.d;
+    if (d) { p.doneOn = p.doneOn || {}; p.doneOn[d] = !p.doneOn[d]; } else p.done = !p.done;
+    save(); render(); if (map) updateRoute();
+  },
   'route-done': el => {
     const v = el.dataset.v === '1';
     if (el.dataset.key) { S.legDone = S.legDone || {}; S.legDone[el.dataset.key] = v; } else byId('plans', el.dataset.id).moved = v;
@@ -1584,6 +1691,11 @@ const A = {
   'cur-addsheet': () => curAddSheet(),
   pview2: el => { ui.planView = el.dataset.k; ui.ttEdit = false; render(); },
   'tt-edit': () => { ui.ttEdit = !ui.ttEdit; render(); },
+  'tt-color': el => { S.settings.ttColor = el.dataset.k; save(); render(); },
+  regions: () => regionsSheet(),
+  'rg-add': () => regionForm(),
+  'rg-edit': el => regionForm(+el.dataset.i),
+  'rg-del': el => confirmSheet('지역을 삭제할까요?', '그 날짜 칸은 회색으로 보여요', '삭제', () => { S.regions.splice(+el.dataset.i, 1); save(); closeSheet(); render(); const e2 = $('#rgList'); if (e2) e2.innerHTML = regionRows(); }),
   pview: el => { ui.placeView = el.dataset.k; render(); },
   'hub-add': () => hubForm(),
   'hub-edit': el => hubForm(byId('places', el.dataset.id)),

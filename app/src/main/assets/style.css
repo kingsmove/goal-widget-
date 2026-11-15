@@ -247,3 +247,4 @@ textarea.in{height:auto;min-height:84px;padding:13px 15px;resize:none;line-heigh
 .blk .rz::after{content:"";position:absolute;left:50%;bottom:3px;width:22px;height:3px;border-radius:2px;background:var(--c);transform:translateX(-50%);opacity:.7}
 .nowline{position:absolute;left:0;right:0;height:2px;background:#F04452;z-index:3;pointer-events:none}
 .nowline::before{content:"";position:absolute;left:-3px;top:-3px;width:8px;height:8px;border-radius:50%;background:#F04452}
+.day .zone i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:0}
