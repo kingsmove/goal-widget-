@@ -15,10 +15,23 @@ const fmtDs = s => { if (!s) return ''; const d = parseD(s); return `${d.getMont
 const ico = (n, cls = 'i') => `<svg class="${cls}"><use href="#i-${n}"/></svg>`;
 const num = v => { const n = parseFloat(String(v).replace(/,/g, '')); return isFinite(n) ? n : 0; };
 
-const CUR = { USD: '$', CAD: 'C$', KRW: '₩' };
+const CURDB = {
+  USD: ['$', '미국 달러'], CAD: ['C$', '캐나다 달러'], EUR: ['€', '유로'], JPY: ['¥', '일본 엔'], CNY: ['CN¥', '중국 위안'],
+  TRY: ['₺', '튀르키예 리라'], GBP: ['£', '영국 파운드'], CHF: ['CHF ', '스위스 프랑'], HKD: ['HK$', '홍콩 달러'], TWD: ['NT$', '대만 달러'],
+  SGD: ['S$', '싱가포르 달러'], THB: ['฿', '태국 바트'], VND: ['₫', '베트남 동'], PHP: ['₱', '필리핀 페소'], AUD: ['A$', '호주 달러'],
+  NZD: ['NZ$', '뉴질랜드 달러'], MXN: ['MX$', '멕시코 페소'], CZK: ['Kč ', '체코 코루나'], HUF: ['Ft ', '헝가리 포린트'], AED: ['AED ', 'UAE 디르함'],
+  KRW: ['₩', '원'],
+};
+const curInfo = c => CURDB[c] || (S.settings.customCur || {})[c] || [c + ' ', c];
+const curSym = c => curInfo(c)[0];
+const curName = c => curInfo(c)[1];
+const NODEC = ['KRW', 'JPY', 'VND', 'HUF', 'TWD'];
+const activeCurs = (extra) => { const l = [...(S.settings.curs || []), 'KRW']; if (extra && !l.includes(extra)) l.splice(l.length - 1, 0, extra); return l; };
+const curPick = extra => Object.fromEntries(activeCurs(extra).map(c => [c, { n: `${curSym(c).trim()} ${curName(c)}` }]));
+const tipCur = () => (S.settings.cur && S.settings.cur !== 'KRW') ? S.settings.cur : (S.settings.curs || [])[0] || 'USD';
 const fmtKRW = n => Math.round(n).toLocaleString('ko-KR') + '원';
 const fmtShortKRW = n => n >= 1e4 ? (Math.round(n / 1e3) / 10).toLocaleString('ko-KR') + '만원' : fmtKRW(n);
-const fmtCur = (a, c) => c === 'KRW' ? fmtKRW(a) : CUR[c] + Number(a).toLocaleString('en-US', { minimumFractionDigits: a % 1 ? 2 : 0, maximumFractionDigits: 2 });
+const fmtCur = (a, c) => c === 'KRW' ? fmtKRW(a) : curSym(c) + Number(a).toLocaleString('en-US', { minimumFractionDigits: a % 1 && !NODEC.includes(c) ? 2 : 0, maximumFractionDigits: NODEC.includes(c) ? 0 : 2 });
 const toKRW = (a, c) => c === 'KRW' ? a : a * (num(S.settings.rates[c]) || 0);
 
 /* ============ constants ============ */
@@ -67,6 +80,13 @@ const TZS = {
   'America/Chicago': { n: '시카고', s: 'CT' },
   'America/New_York': { n: '뉴욕', s: 'ET' },
   'America/Toronto': { n: '토론토', s: 'ET' },
+  'Europe/London': { n: '런던', s: 'GMT' },
+  'Europe/Paris': { n: '파리', s: 'CET' },
+  'Europe/Madrid': { n: '마드리드', s: 'CET' },
+  'Europe/Rome': { n: '로마', s: 'CET' },
+  'Europe/Istanbul': { n: '이스탄불', s: 'TRT' },
+  'Asia/Shanghai': { n: '베이징·상하이', s: 'CST' },
+  'Asia/Tokyo': { n: '도쿄', s: 'JST' },
 };
 const tzOf = p => (p && p.tz && TZS[p.tz]) ? p.tz : (S.settings.tz || 'America/Los_Angeles');
 function tzParts(ms, tz) {
@@ -91,7 +111,8 @@ function nowIn(tz) { const q = tzParts(Date.now(), tz); return `${pad(q.h)}:${pa
 function tzFromText(v) {
   const t = String(v || '').trim(); if (!t) return '';
   if (TZS[t]) return t;
-  const rules = [[/한국|서울|KST|인천/i, 'Asia/Seoul'], [/호놀|하와이|HST/i, 'Pacific/Honolulu'], [/밴쿠버/i, 'America/Vancouver'], [/옐로|에드먼턴|캘거리|MT|덴버/i, 'America/Edmonton'],
+  const rules = [[/한국|서울|KST|인천/i, 'Asia/Seoul'], [/로마|이탈리아|밀라노/i, 'Europe/Rome'], [/마드리드|스페인|바르셀로나/i, 'Europe/Madrid'], [/파리|프랑스/i, 'Europe/Paris'], [/런던|영국|GMT/i, 'Europe/London'],
+    [/이스탄불|튀르키예|터키|TRT/i, 'Europe/Istanbul'], [/베이징|상하이|중국|북경/i, 'Asia/Shanghai'], [/도쿄|일본|오사카|JST/i, 'Asia/Tokyo'], [/호놀|하와이|HST/i, 'Pacific/Honolulu'], [/밴쿠버/i, 'America/Vancouver'], [/옐로|에드먼턴|캘거리|MT|덴버/i, 'America/Edmonton'],
     [/시카고|CT/i, 'America/Chicago'], [/토론토/i, 'America/Toronto'], [/뉴욕|ET/i, 'America/New_York'], [/LA|로스|베가스|라스|PT|태평양|샌프/i, 'America/Los_Angeles']];
   for (const [re, z] of rules) if (re.test(t)) return z;
   return '';
@@ -104,7 +125,7 @@ function seed() {
   const lvcc = uid(), union = uid();
   return {
     v: 1,
-    settings: { title: '미국 여행', route: 'LA · 라스베이거스 · 캐나다', start: '', end: '', rates: { USD: 1340, CAD: 970 }, budget: 0, theme: 'auto', cur: 'USD', tz: 'America/Los_Angeles', showRoute: true },
+    settings: { title: '미국 여행', route: 'LA · 라스베이거스 · 캐나다', start: '', end: '', rates: { USD: 1340, CAD: 970 }, curs: ['USD', 'CAD'], customCur: {}, ratesAt: '', budget: 0, theme: 'auto', cur: 'USD', tz: 'America/Los_Angeles', showRoute: true },
     modules: ['plan', 'map', 'place', 'money', 'photo', 'book'].map(k => ({ k, on: true })),
     places: [
       { id: union, name: 'LA 유니언역 (플릭스버스)', cat: 'move', status: 'want', lat: 34.0562, lng: -118.2365, address: '800 N Alameda St, Los Angeles, CA', memo: '라스베이거스행 플릭스버스 출발지', date: '', url: '', rating: 0 },
@@ -124,6 +145,7 @@ function load() {
   const d = seed();
   S.settings = Object.assign({}, d.settings, S.settings);
   S.settings.rates = Object.assign({}, d.settings.rates, S.settings.rates);
+  if (!Array.isArray(S.settings.curs)) S.settings.curs = ['USD', 'CAD'];
   for (const k of ['places', 'plans', 'bookings', 'expenses', 'photos', 'budget', 'maps']) if (!Array.isArray(S[k])) S[k] = [];
   if (!Array.isArray(S.modules)) S.modules = d.modules;
   for (const k of Object.keys(MODS)) if (!S.modules.find(m => m.k === k)) S.modules.push({ k, on: true });
@@ -388,7 +410,7 @@ async function importExcel(file) {
     const get = i => (i >= 0 ? r[i] : '');
     const title = String(get(C.title)).trim();
     if (!title || /\(예시\)/.test(title)) continue;
-    const end = xlTime(get(C.end)), cost = num(get(C.cost)), cur = ['USD', 'CAD', 'KRW'].includes(String(get(C.cur)).trim()) ? String(get(C.cur)).trim() : 'USD';
+    const end = xlTime(get(C.end)), cost = num(get(C.cost)), cc = String(get(C.cur)).trim().toUpperCase(), cur = /^[A-Z]{3}$/.test(cc) ? cc : tipCur();
     const memo = [end ? '~' + end : '', cost ? fmtCur(cost, cur) : '', String(get(C.memo)).trim()].filter(Boolean).join(' · ');
     const p = { id: uid(), date: xlDate(get(C.date)), time: xlTime(get(C.time)), title, cat: kindKey(get(C.kind)), placeId: '', memo, done: false, tz: tzFromText(get(C.tz)) || S.settings.tz };
     if (S.plans.some(x => x.title === p.title && (x.date || '') === p.date && (x.time || '') === p.time)) { dup++; continue; }
@@ -529,7 +551,6 @@ async function locSearch() {
 
 /* ============ MONEY ============ */
 const ECO = Object.fromEntries(Object.entries(ECATS).map(([k, n]) => [k, { n, c: CATS[k].c, i: CATS[k].i }]));
-const CURS = { USD: { n: '$ 달러' }, CAD: { n: 'C$ 캐나다' }, KRW: { n: '₩ 원' } };
 const budgetTotal = () => S.budget.length ? S.budget.reduce((a, b) => a + toKRW(num(b.amount), b.cur), 0) : num(S.settings.budget);
 const BUD_TEMPLATE = [
   ['flight', '왕복 항공권'], ['flight', '캐나다 이동 항공권'], ['etc', 'ESTA·여행자보험'],
@@ -573,7 +594,7 @@ function budForm(b) {
     title: isNew ? '예산 항목 추가' : '예산 항목',
     body: `<div class="f"><label>항목</label><input class="in" id="fTitle" value="${esc(b.title)}" placeholder="예: 라스베이거스 숙소 5박"></div>
       <div class="f"><label>예상 금액</label><input class="in amt" id="fAmt" inputmode="decimal" placeholder="0" value="${esc(b.amount)}"><div class="coord" id="fKRW"></div></div>
-      <div class="f">${pick('fCur', CURS, b.cur)}</div>
+      <div class="f">${pick('fCur', curPick(b.cur), b.cur)}</div>
       <div class="f"><label>분류</label>${pick('fCat', ECO, b.cat)}</div>
       <div class="f"><label>결제</label>${pick('fPaid', { no: { n: '아직' }, yes: { n: '결제 완료' } }, b.paid ? 'yes' : 'no')}</div>
       <div class="f"><label>메모</label><input class="in" id="fMemo" value="${esc(b.memo)}" placeholder="예: 1박 $90 × 5박"></div>
@@ -605,12 +626,12 @@ function vMoney() {
     ${BT > 0 ? `<div class="bar"><i style="width:${Math.min(100, total / BT * 100)}%;background:${total > BT ? 'var(--red)' : 'var(--blue)'}"></i></div><div class="sub" style="margin-top:8px">예산 ${fmtKRW(BT)} 중 ${Math.round(total / BT * 100)}% · ${total > BT ? fmtKRW(total - BT) + ' 초과' : fmtKRW(BT - total) + ' 남음'}</div>` : ''}
     ${cats.length ? `<div class="bar">${cats.map(([k, v]) => `<i style="width:${v / total * 100}%;background:${(CATS[k] || CATS.etc).c}"></i>`).join('')}</div>
     <div class="legend">${cats.map(([k, v]) => `<div class="row"><span class="dot" style="background:${(CATS[k] || CATS.etc).c}"></span><span class="x">${ECATS[k] || '기타'}</span><b>${fmtKRW(v)}</b><span class="p">${Math.round(v / total * 100)}%</span></div>`).join('')}</div>
-    <div class="sub" style="margin-top:14px">카드 ${fmtKRW(card)} · 현금 ${fmtKRW(total - card)} · 환율 $1=${num(st.rates.USD).toLocaleString()}원</div>` : ''}
+    <div class="sub" style="margin-top:14px">카드 ${fmtKRW(card)} · 현금 ${fmtKRW(total - card)} <br>환율 ${(st.curs || []).map(c => `${curSym(c).trim()}1=${num(st.rates[c]).toLocaleString()}원`).join(' · ')}</div>` : ''}
   </div></div>`;
   // tip calculator
   h += `<div class="sec"><div class="card" style="padding:16px 18px">
     <button class="row" data-a="tip-toggle" style="width:100%"><div class="ico" style="background:#F5A623;width:36px;height:36px;border-radius:11px">${ico('tip')}</div><div style="flex:1;text-align:left;font-weight:600">팁 계산기</div><span class="chev">${ico(ui.tipOpen ? 'up' : 'down', 'i s')}</span></button>
-    ${ui.tipOpen ? `<div class="f"><input class="in amt" id="tipBill" inputmode="decimal" placeholder="$ 계산서 금액" value="${esc(ui.tipBill || '')}"></div>
+    ${ui.tipOpen ? `<div class="f"><input class="in amt" id="tipBill" inputmode="decimal" placeholder="${curSym(tipCur()).trim()} 계산서 금액" value="${esc(ui.tipBill || '')}"></div>
       <div class="f"><div class="seg" id="tipPct">${[15, 18, 20, 22].map(p => `<button class="${(ui.tipPct || 18) === p ? 'on' : ''}" data-a="tip-pct" data-p="${p}">${p}%</button>`).join('')}</div></div>
       <div id="tipOut"></div>` : ''}
   </div></div>`;
@@ -632,9 +653,9 @@ function tipCalc() {
   const el = $('#tipOut'); if (!el) return;
   const b = num($('#tipBill').value); ui.tipBill = $('#tipBill').value;
   const p = ui.tipPct || 18, tip = Math.round(b * p) / 100, tot = Math.round((b + tip) * 100) / 100;
-  el.innerHTML = b ? `<div class="f"><div class="row" style="justify-content:space-between"><span class="sub">팁 ${p}%</span><b>${fmtCur(tip, 'USD')}</b></div>
-    <div class="row" style="justify-content:space-between;margin-top:8px"><span class="sub">합계</span><b style="font-size:20px">${fmtCur(tot, 'USD')}</b></div>
-    <div class="row" style="justify-content:space-between;margin-top:4px"><span class="sub"></span><span class="sub">${fmtKRW(toKRW(tot, 'USD'))}</span></div>
+  el.innerHTML = b ? `<div class="f"><div class="row" style="justify-content:space-between"><span class="sub">팁 ${p}%</span><b>${fmtCur(tip, tipCur())}</b></div>
+    <div class="row" style="justify-content:space-between;margin-top:8px"><span class="sub">합계</span><b style="font-size:20px">${fmtCur(tot, tipCur())}</b></div>
+    <div class="row" style="justify-content:space-between;margin-top:4px"><span class="sub"></span><span class="sub">${fmtKRW(toKRW(tot, tipCur()))}</span></div>
     <button class="btn pri" style="width:100%;margin-top:14px" data-a="tip-add" data-v="${tot}">이 금액 경비로 기록</button></div>` : '';
 }
 function expForm(e, preset) {
@@ -643,7 +664,7 @@ function expForm(e, preset) {
   sheet({
     title: isNew ? '지출 기록' : '지출 수정',
     body: `<div class="f"><input class="in amt" id="fAmt" inputmode="decimal" placeholder="0" value="${esc(e.amount)}"><div class="coord" id="fKRW"></div></div>
-      <div class="f">${pick('fCur', CURS, e.cur)}</div>
+      <div class="f">${pick('fCur', curPick(e.cur), e.cur)}</div>
       <div class="f"><label>분류</label>${pick('fCat', ECO, e.cat)}</div>
       <div class="f"><label>결제</label>${pick('fPay', { card: { n: '카드' }, cash: { n: '현금' } }, e.pay)}</div>
       <div class="f"><label>내용</label><input class="in" id="fMemo" value="${esc(e.memo)}" placeholder="예: 인앤아웃 더블더블"></div>
@@ -831,7 +852,9 @@ function settingsSheet() {
     body: `<div class="f"><label>여행 이름</label><input class="in" data-set="title" value="${esc(st.title)}"></div>
       <div class="f"><label>경로 (· 로 구분)</label><input class="in" data-set="route" value="${esc(st.route)}"></div>
       <div class="f two"><div><label>시작일</label><input class="in" type="date" data-set="start" value="${esc(st.start)}"></div><div><label>종료일</label><input class="in" type="date" data-set="end" value="${esc(st.end)}"></div></div>
-      <div class="f two"><div><label>1달러 = 원</label><input class="in" inputmode="decimal" data-rate="USD" value="${esc(st.rates.USD)}"></div><div><label>1캐나다달러 = 원</label><input class="in" inputmode="decimal" data-rate="CAD" value="${esc(st.rates.CAD)}"></div></div>
+      <div class="f"><label>통화·환율 (1단위 = 원)</label><div id="curList">${curRows()}</div>
+        <div class="btns" style="margin-top:8px"><button class="btn" data-a="cur-addsheet">${ico('plus', 'i s')}통화 추가</button><button class="btn" data-a="cur-fetch">최신 환율 불러오기</button></div>
+        <div class="coord" id="ratesAt">${st.ratesAt ? `마지막 자동 갱신 ${esc(st.ratesAt)}` : '인터넷 연결 시 버튼 한 번으로 오늘 환율이 들어가요'}</div></div>
       ${S.budget.length ? '' : `<div class="f"><label>총 예산 (원) · 경비 → 예산 짜기에서 항목별로도 짤 수 있어요</label><input class="in" inputmode="numeric" data-set="budget" value="${st.budget || ''}" placeholder="예: 2000000"></div>`}
       <div class="f"><label>기능 켜기·끄기·순서 <span style="font-weight:400">(앞의 4개가 아래 탭에 나와요)</span></label><div class="list" id="modList" style="background:var(--card2)">${modRows()}</div></div>
       <div class="f"><label>여행지 기본 시간대 (새 일정에 쓰여요)</label>${pick('setTz', Object.fromEntries(Object.entries(TZS).map(([k, v]) => [k, { n: `${v.n} ${v.s}` }])), st.tz)}</div>
@@ -850,6 +873,52 @@ function settingsSheet() {
       ui.modRows = modRows;
     },
   });
+}
+function curRows() {
+  const st = S.settings;
+  return `<div class="list" style="background:var(--card2)">${(st.curs || []).map(c => `<div class="li" style="padding:8px 8px 8px 14px">
+    <div class="m"><div class="t" style="font-size:15px">${esc(c)} <span class="sub" style="font-weight:400">${esc(curName(c))}</span></div></div>
+    <input class="in" inputmode="decimal" data-rate="${esc(c)}" value="${esc(st.rates[c] ?? '')}" placeholder="환율" style="width:110px;height:42px;text-align:right">
+    <span class="sub">원</span><button class="mv" data-a="cur-rm" data-k="${esc(c)}">${ico('x', 'i s')}</button></div>`).join('') || '<div class="empty" style="padding:18px">추가한 외화가 없어요</div>'}</div>`;
+}
+function refreshCur() { const el = $('#curList'); if (el) el.innerHTML = curRows(); const a = $('#ratesAt'); if (a && S.settings.ratesAt) a.textContent = `마지막 자동 갱신 ${S.settings.ratesAt}`; }
+async function fetchRates(quiet) {
+  const codes = (S.settings.curs || []).filter(c => c !== 'KRW');
+  if (!codes.length) return;
+  if (!quiet) toast('환율 불러오는 중…');
+  const tries = [
+    async () => { const j = await (await fetch('https://open.er-api.com/v6/latest/KRW')).json(); if (j.result !== 'success') throw 0; return j.rates; },
+    async () => { const j = await (await fetch('https://api.frankfurter.app/latest?from=KRW')).json(); if (!j.rates) throw 0; return j.rates; },
+  ];
+  for (const t of tries) {
+    try {
+      const r = await t(); let n = 0;
+      for (const c of codes) if (r[c] > 0) { S.settings.rates[c] = +(1 / r[c]).toFixed(c === 'VND' || c === 'HUF' ? 4 : 2); n++; }
+      if (!n) throw 0;
+      const d = new Date(); S.settings.ratesAt = `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      save(); refreshCur(); render();
+      const miss = codes.filter(c => !(r[c] > 0)), noRate = miss.filter(c => !num(S.settings.rates[c]));
+      if (!quiet) toast(!miss.length ? '오늘 환율로 바꿨어요' : noRate.length ? `${noRate.join(', ')} 환율은 직접 입력해주세요` : `오늘 환율로 바꿨어요 · ${miss.join(', ')}은 입력값 유지`);
+      return true;
+    } catch (e) { }
+  }
+  if (!quiet) toast('환율을 못 불러왔어요 · 인터넷 연결을 확인해주세요');
+  return false;
+}
+function curAddSheet() {
+  const left = Object.keys(CURDB).filter(c => c !== 'KRW' && !(S.settings.curs || []).includes(c));
+  sheet({
+    title: '통화 추가',
+    body: `<div class="pick">${left.map(c => `<button data-a="cur-add" data-k="${c}">${esc(curSym(c).trim())} ${esc(curName(c))}</button>`).join('')}</div>
+      <div class="f"><label>목록에 없으면 직접</label><div class="two"><input class="in" id="cCode" placeholder="코드 (예: MYR)" maxlength="3" autocapitalize="characters"><input class="in" id="cSym" placeholder="기호 (예: RM)"></div>
+      <div class="two" style="margin-top:8px"><input class="in" id="cName" placeholder="이름 (예: 말레이시아 링깃)"><input class="in" id="cRate" inputmode="decimal" placeholder="1단위 = 원"></div></div>`,
+    foot: `<button class="btn big pri" data-a="cur-custom">직접 추가</button>`,
+  });
+}
+function addCur(c) {
+  S.settings.curs = S.settings.curs || [];
+  if (!S.settings.curs.includes(c)) S.settings.curs.push(c);
+  save(); refreshCur(); render();
 }
 function exportData() {
   const name = `trip-backup-${todayStr()}.json`, txt = JSON.stringify(S, null, 1);
@@ -1168,6 +1237,17 @@ const A = {
     meMarker = new maplibregl.Marker({ element: el }).setLngLat([ln, la]).addTo(map); map.flyTo({ center: [ln, la], zoom: 15 });
   }),
   'map-imgs': () => mapImgsSheet(),
+  'cur-addsheet': () => curAddSheet(),
+  'cur-add': el => { addCur(el.dataset.k); closeSheet(); toast(`${curName(el.dataset.k)} 추가`); fetchRates(true).then(ok => { if (!ok && !S.settings.rates[el.dataset.k]) toast('환율을 직접 입력해주세요'); }); },
+  'cur-custom': () => {
+    const c = $('#cCode').value.trim().toUpperCase(); if (!/^[A-Z]{3}$/.test(c)) { toast('영문 3글자 코드를 넣어주세요'); return; }
+    S.settings.customCur = S.settings.customCur || {};
+    if (!CURDB[c]) S.settings.customCur[c] = [($('#cSym').value.trim() || c) + ' ', $('#cName').value.trim() || c];
+    if (num($('#cRate').value)) S.settings.rates[c] = num($('#cRate').value);
+    addCur(c); closeSheet(); if (!S.settings.rates[c]) fetchRates(true);
+  },
+  'cur-rm': el => { const c = el.dataset.k; if (S.expenses.some(e => e.cur === c) || S.budget.some(b => b.cur === c)) { toast('이 통화로 적은 기록이 있어서 환율은 남겨둘게요'); } S.settings.curs = S.settings.curs.filter(x => x !== c); if (S.settings.cur === c) S.settings.cur = 'KRW'; save(); refreshCur(); render(); },
+  'cur-fetch': () => fetchRates(false),
   'xl-import': () => { const i = $('#xlIn'); i.value = ''; i.click(); },
   'mapimg-add': () => pickFiles({ kind: 'map' }),
   'mapimg-open': el => { const ids = S.maps.map(m => m.id); openViewer(ids, ids.indexOf(el.dataset.id), 'map'); },
@@ -1193,7 +1273,7 @@ const A = {
   'exp-del': el => confirmSheet('지출을 삭제할까요?', '되돌릴 수 없어요', '삭제', () => { S.expenses = S.expenses.filter(x => x.id !== el.dataset.id); save(); closeSheet(true); render(); }),
   'tip-toggle': () => { ui.tipOpen = !ui.tipOpen; render(); if (ui.tipOpen) tipCalc(); },
   'tip-pct': el => { ui.tipPct = +el.dataset.p; $$('#tipPct button').forEach(b => b.classList.toggle('on', b === el)); tipCalc(); },
-  'tip-add': el => expForm(null, { amount: +el.dataset.v, cur: 'USD', cat: 'food', memo: '' }),
+  'tip-add': el => expForm(null, { amount: +el.dataset.v, cur: tipCur(), cat: 'food', memo: '' }),
   // photos
   'photo-add': () => pickFiles({ kind: 'photo' }),
   'photo-open': el => {
