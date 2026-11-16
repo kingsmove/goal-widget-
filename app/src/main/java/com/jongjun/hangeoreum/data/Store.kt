@@ -29,6 +29,7 @@ object Store {
         runCatching { save(next) }
         runCatching { com.jongjun.hangeoreum.widget.WidgetKit.refreshAll(app) }
         runCatching { com.jongjun.hangeoreum.notify.Reminders.reschedule(app) }
+        runCatching { com.jongjun.hangeoreum.sync.Sync.onLocalChange() }
     }
 
     // ---------- Goals ----------

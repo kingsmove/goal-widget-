@@ -256,6 +256,8 @@ fun InputField(
     size: Int = 22,
     singleLine: Boolean = true,
     focusRequester: FocusRequester? = null,
+    password: Boolean = false,
+    email: Boolean = false,
 ) {
     var focused by remember { mutableStateOf(false) }
     val lineColor by animateColorAsState(if (focused) pal.blue else pal.line, label = "line")
@@ -271,7 +273,16 @@ fun InputField(
                     color = pal.text, letterSpacing = (-0.3).sp,
                 ),
                 cursorBrush = SolidColor(pal.blue),
-                keyboardOptions = KeyboardOptions(imeAction = if (singleLine) ImeAction.Done else ImeAction.Default),
+                keyboardOptions = KeyboardOptions(
+                    imeAction = if (singleLine) ImeAction.Done else ImeAction.Default,
+                    keyboardType = when {
+                        password -> androidx.compose.ui.text.input.KeyboardType.Password
+                        email -> androidx.compose.ui.text.input.KeyboardType.Email
+                        else -> androidx.compose.ui.text.input.KeyboardType.Text
+                    },
+                ),
+                visualTransformation = if (password) androidx.compose.ui.text.input.PasswordVisualTransformation()
+                else androidx.compose.ui.text.input.VisualTransformation.None,
                 modifier = Modifier.fillMaxWidth()
                     .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
                     .onFocusChanged { focused = it.isFocused },

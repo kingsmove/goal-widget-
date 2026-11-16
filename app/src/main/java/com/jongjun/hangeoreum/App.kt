@@ -7,5 +7,6 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
         Store.init(this)
+        com.jongjun.hangeoreum.sync.Sync.init(this)
     }
 }

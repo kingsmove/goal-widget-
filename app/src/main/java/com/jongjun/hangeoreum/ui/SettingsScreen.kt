@@ -87,6 +87,8 @@ fun SettingsScreen(data: AppData, onBack: () -> Unit, update: UpdateInfo?, onUpd
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item { SyncCard() }
+
             item {
                 CardBox {
                     SectionTitle("화면 모드")
