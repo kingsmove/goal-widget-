@@ -155,9 +155,10 @@ function load(){
   catch(e){ D = blank(); }
 }
 let saveTimer = null;
-function save(){
-  try { localStorage.setItem(KEY, JSON.stringify(D)); document.getElementById("savedAt").textContent = "자동 저장됨 · " + hm(Date.now()); }
+function save(fromRemote){
+  try { localStorage.setItem(KEY, JSON.stringify(D)); document.getElementById("savedAt").textContent = (Sync.user ? "동기화 · " : "자동 저장됨 · ") + hm(Date.now()); }
   catch(e){ toast("저장하지 못했어요 (브라우저 저장소)"); }
+  if (!fromRemote) Sync.schedule();
 }
 function commit(){ save(); render(); }
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now());
@@ -833,10 +834,159 @@ function copyResume(){
   navigator.clipboard.writeText(txt).then(() => toast("복사했어요"), () => toast("복사하지 못했어요"));
 }
 
+
+// ============================================================ SYNC (Firebase: login once, same data on phone + PC)
+// Layout in Firestore:  users/{uid}/items/{coll~id | meta}  =  { json: "<item as JSON>", t: <ms>, del: <bool> }
+// web key (read from the console) first, the Android key as a fallback if the first is rejected
+const FB_KEYS = ["AIzaSyB9WBawGvrwpYBnZckqcBz0yv6MqbVnMCc", "AIzaSyA3scnHu8KLSGlOdHznx4QOZccfGuZKGhw"];
+const FB_KEY_IDX = Math.min(+(localStorage.getItem("ufk-keyidx") || 0), FB_KEYS.length - 1);
+const FB_CONFIG = {
+  apiKey: FB_KEYS[FB_KEY_IDX],
+  authDomain: "ultimate-final-kingsmove.firebaseapp.com",
+  projectId: "ultimate-final-kingsmove",
+  storageBucket: "ultimate-final-kingsmove.firebasestorage.app",
+  messagingSenderId: "30400442323",
+  appId: "1:30400442323:web:fa6051555e188b6f1e4926",
+};
+const COLLS = ["goals","sessions","events","routines","subjects","quotes","scores"];
+const Sync = {
+  user: null, status: "", ready: false, applying: false, timer: null, unsub: null,
+  get synced(){ try { return JSON.parse(localStorage.getItem("ufk-synced") || "{}"); } catch(e){ return {}; } },
+  set synced(v){ try { localStorage.setItem("ufk-synced", JSON.stringify(v)); } catch(e){} },
+  get pulled(){ return +(localStorage.getItem("ufk-pulled") || 0); },
+  set pulled(v){ try { localStorage.setItem("ufk-pulled", String(v)); } catch(e){} },
+
+  /** data -> { "goals~id": json, ..., "meta": json } */
+  split(d){
+    const m = {}, meta = {};
+    for (const k of Object.keys(d)){
+      if (COLLS.includes(k)) (d[k] || []).forEach(o => { if (o && o.id != null) m[k + "~" + o.id] = JSON.stringify(o); });
+      else meta[k] = d[k];
+    }
+    m.meta = JSON.stringify(meta);
+    return m;
+  },
+  join(m){
+    const d = m.meta ? JSON.parse(m.meta) : {};
+    COLLS.forEach(c => d[c] = []);
+    for (const [k, v] of Object.entries(m)){ if (k === "meta") continue; const i = k.indexOf("~"), c = k.slice(0, i); if (COLLS.includes(c)) d[c].push(JSON.parse(v)); }
+    return normalize(d);
+  },
+  setStatus(t){ this.status = t; const el = document.getElementById("syncStatus"); if (el) el.textContent = t; },
+
+  async loadSdk(){
+    if (window.firebase) return;
+    const v = "10.14.1", load = src => new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+    await load(`https://www.gstatic.com/firebasejs/${v}/firebase-app-compat.js`);
+    await load(`https://www.gstatic.com/firebasejs/${v}/firebase-auth-compat.js`);
+    await load(`https://www.gstatic.com/firebasejs/${v}/firebase-firestore-compat.js`);
+  },
+  async init(){
+    try {
+      await this.loadSdk();
+      firebase.initializeApp(FB_CONFIG);
+      this.auth = firebase.auth(); this.db = firebase.firestore();
+      this.auth.onAuthStateChanged(u => {
+        this.user = u; if (this.unsub){ this.unsub(); this.unsub = null; }
+        if (u) this.start(); else this.setStatus("로그인하면 폰과 같은 데이터를 써요");
+        if (view === "settings") render();
+      });
+      this.ready = true;
+    } catch(e){ this.setStatus("동기화 서버에 연결하지 못했어요 (인터넷 확인)"); }
+  },
+  col(){ return this.db.collection("users").doc(this.user.uid).collection("items"); },
+  async start(){
+    try {
+      if (!Object.keys(this.synced).length){
+        // first time on this PC: take everything from the server, keep things only this PC has
+        this.setStatus("처음 동기화 중…");
+        const snap = await this.col().get();
+        const remote = {};
+        let maxT = 0;
+        snap.forEach(doc => { const x = doc.data(); maxT = Math.max(maxT, x.t || 0); if (!x.del) remote[doc.id] = x.json; });
+        const local = this.split(D), merged = Object.assign({}, local, remote);
+        if (remote.meta) merged.meta = remote.meta;
+        this.applying = true; D = this.join(merged); ensureRoutines(); save(true); this.applying = false;
+        this.synced = Object.fromEntries(Object.entries(this.split(D)).filter(([k]) => k in remote));
+        this.pulled = maxT;
+        render();
+        await this.push();
+      }
+      this.listen();
+    } catch(e){ console.error(e); this.setStatus("동기화 오류: " + (e.code || e.message)); }
+  },
+  listen(){
+    const since = Math.max(0, this.pulled - 5 * 60000);
+    this.unsub = this.col().where("t", ">", since).onSnapshot(snap => {
+      let changed = false, maxT = this.pulled;
+      const m = this.split(D), syncedNow = this.synced;
+      snap.docChanges().forEach(ch => {
+        const doc = ch.doc, x = doc.data();
+        if (doc.metadata.hasPendingWrites) return;
+        maxT = Math.max(maxT, x.t || 0);
+        if (x.del){ if (doc.id in m){ delete m[doc.id]; changed = true; } delete syncedNow[doc.id]; }
+        else if (m[doc.id] !== x.json){ m[doc.id] = x.json; changed = true; }
+      });
+      this.pulled = maxT;
+      if (changed){
+        this.applying = true; D = this.join(m); save(true); this.applying = false;
+        const after = this.split(D);
+        snap.docChanges().forEach(ch => { const id = ch.doc.id; if (after[id] != null) syncedNow[id] = after[id]; });
+        this.synced = syncedNow;
+        if (!document.querySelector(".ov")) render();
+      }
+      this.setStatus("동기화됨 · " + hm(Date.now()));
+    }, e => this.setStatus("동기화 오류: " + (e.code || e.message)));
+  },
+  schedule(){ if (!this.user || this.applying) return; clearTimeout(this.timer); this.timer = setTimeout(() => this.push(), 1200); },
+  async push(){
+    if (!this.user) return;
+    const local = this.split(D), old = this.synced, now = Date.now(), ops = [];
+    for (const [k, v] of Object.entries(local)) if (old[k] !== v) ops.push([k, {json: v, t: now, del: false}]);
+    for (const k of Object.keys(old)) if (!(k in local)) ops.push([k, {json: "", t: now, del: true}]);
+    if (!ops.length){ this.setStatus("동기화됨 · " + hm(now)); return; }
+    this.setStatus("올리는 중…");
+    try {
+      for (let i = 0; i < ops.length; i += 400){
+        const b = this.db.batch();
+        ops.slice(i, i + 400).forEach(([k, v]) => b.set(this.col().doc(k), v));
+        await b.commit();
+      }
+      this.synced = local;
+      this.setStatus("동기화됨 · " + hm(Date.now()));
+    } catch(e){ this.setStatus("올리지 못했어요: " + (e.code || e.message)); }
+  },
+  async signIn(email, pw, create){
+    try {
+      if (create) await this.auth.createUserWithEmailAndPassword(email, pw);
+      else await this.auth.signInWithEmailAndPassword(email, pw);
+    } catch(e){
+      if (String(e.code || "").startsWith("auth/api-key-not-valid") && FB_KEY_IDX < FB_KEYS.length - 1){
+        localStorage.setItem("ufk-keyidx", String(FB_KEY_IDX + 1)); toast("연결 설정을 바꿔서 다시 시도할게요"); setTimeout(() => location.reload(), 900); return;
+      }
+      const msg = {"auth/invalid-credential":"이메일이나 비밀번호가 맞지 않아요","auth/wrong-password":"비밀번호가 맞지 않아요","auth/user-not-found":"가입된 이메일이 아니에요","auth/email-already-in-use":"이미 가입된 이메일이에요. 로그인해주세요","auth/weak-password":"비밀번호는 6자 이상이어야 해요","auth/invalid-email":"이메일 형식을 확인해주세요","auth/network-request-failed":"인터넷 연결을 확인해주세요"}[e.code];
+      toast(msg || ("로그인 실패: " + (e.code || e.message)));
+    }
+  },
+  async signOut(){ if (this.unsub) this.unsub(); this.unsub = null; await this.auth.signOut(); this.synced = {}; this.pulled = 0; },
+};
+function syncCard(){
+  if (!Sync.ready) return `<div class="card"><h3>계정 · 동기화</h3><div class="small muted" id="syncStatus">${esc(Sync.status || "연결하는 중…")}</div></div>`;
+  if (!Sync.user) return `<div class="card"><h3>계정 · 동기화</h3>
+    <p class="small muted" style="line-height:1.6">폰 UFK와 같은 이메일로 로그인하면 폰·PC가 같은 데이터를 써요. 처음이면 ‘가입하기’를 눌러요.</p>
+    <label class="f">이메일</label><input id="lgEmail" type="email" autocomplete="username">
+    <label class="f">비밀번호 (6자 이상)</label><input id="lgPw" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')Sync.signIn($('#lgEmail').value.trim(),$('#lgPw').value,false)">
+    <div class="row" style="margin-top:14px"><button class="btn2 grow" onclick="Sync.signIn($('#lgEmail').value.trim(),$('#lgPw').value,true)">가입하기</button><button class="btn grow" onclick="Sync.signIn($('#lgEmail').value.trim(),$('#lgPw').value,false)">로그인</button></div>
+    <button class="link" style="margin-top:12px;background:transparent;padding:0" onclick="const e=$('#lgEmail').value.trim(); if(!e) return toast('이메일을 먼저 적어주세요'); Sync.auth.sendPasswordResetEmail(e).then(()=>toast('비밀번호 재설정 메일을 보냈어요'),()=>toast('메일을 보내지 못했어요'))">비밀번호를 잊었어요</button></div>`;
+  return `<div class="card"><h3>계정 · 동기화</h3><div style="font-weight:700">${esc(Sync.user.email)}</div><div class="small muted" id="syncStatus" style="margin-top:4px">${esc(Sync.status)}</div>
+    <div class="row" style="margin-top:14px"><button class="btn2 grow" onclick="Sync.signOut()">로그아웃</button><button class="btn grow" onclick="Sync.push()">지금 올리기</button></div></div>`;
+}
+
 // ============================================================ SETTINGS (backup = same file as the phone app)
 function vSettings(){
   const th = D.theme || {};
   return `<h1>설정</h1><div class="grid g2" style="align-items:start">
+    ${syncCard()}
     <div class="card"><h3>폰 앱과 주고받기</h3>
       <p class="muted small" style="line-height:1.6">폰 UFK의 <b>설정 → 데이터 백업 → 백업 저장</b>으로 만든 파일을 여기서 열면 그대로 이어서 쓸 수 있어요. PC에서 고친 뒤 <b>백업 파일 내보내기</b>를 해서 폰에서 <b>불러오기</b>하면 폰에 반영돼요.</p>
       <div class="row" style="margin-top:14px"><button class="btn2 grow" onclick="$('#fileIn').click()">백업 파일 열기</button><button class="btn grow" onclick="exportBackup()">백업 파일 내보내기</button></div>
@@ -874,6 +1024,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => appl
 setInterval(() => { const c = document.getElementById("tclock"); if (c && D.timer.running) c.textContent = clock(timerElapsed()); }, 500);
 
 load(); ensureRoutines(); render();
+if (!FB_CONFIG.apiKey.startsWith("__")) Sync.init(); else Sync.setStatus("동기화가 설정되지 않은 버전이에요");
 </script>
 </body>
 </html>
