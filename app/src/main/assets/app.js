@@ -81,7 +81,7 @@ const TZS = {
   'Asia/Seoul': { n: '한국', s: 'KST' },
   'Pacific/Honolulu': { n: '호놀룰루', s: 'HST' },
   'America/Los_Angeles': { n: 'LA·SF·베가스', s: 'PT' },
-  'America/Vancouver': { n: '밴쿠버', s: 'PT' },
+  'America/Vancouver': { n: '밴쿠버', s: 'UTC-7' }, // BC: permanent -07 since 2026 (an hour ahead of LA in winter)
   'America/Edmonton': { n: '옐로나이프', s: 'MT' },
   'America/Chicago': { n: '시카고', s: 'CT' },
   'America/New_York': { n: '뉴욕', s: 'ET' },
@@ -155,7 +155,9 @@ const rgPill = l => l.length ? `<span class="rpill" style="background:${rgFill(l
 // why does a date show up as two columns? explain, and offer to move stray plans to the region's time zone
 function tzNote(date, tz) {
   const zones = [...new Set(expandPlans().filter(p => p.date === date || (isTrip(p) && p.mv.arrDate === date)).flatMap(p => p.date === date ? [tzOf(p)] : []).concat(expandPlans().filter(p => isTrip(p) && p.mv.arrDate === date).map(p => p.mv.arrTz || tzOf(p))))];
-  if (zones.length < 2 && !(tz && zones.length === 1 && zones[0] !== tz)) return '';
+  const offOf = z => { try { return Math.round(tzOffset(localToUTC(date, '12:00', z), z) / 6e4); } catch (e) { return z; } };
+  const nCols = new Set(zones.map(offOf)).size;
+  if (nCols < 2) return '';
   const regs = dayRegs(date), rtz = [...new Set(regs.map(r => r.tz))];
   const rows = zones.map(z => {
     const ps = S.plans.filter(p => p.date === date && tzOf(p) === z);
@@ -164,7 +166,7 @@ function tzNote(date, tz) {
     const fix = rtz.length && !rtz.includes(z) && ps.some(p => !isTrip(p)) ? rtz.map(t => `<button class="btn" style="height:38px;font-size:13px;margin-top:6px" data-a="tz-fix" data-d="${date}" data-from="${z}" data-to="${t}">이 칸 일정 ${TZS[t].n} 시간으로</button>`).join('') : '';
     return `<div style="margin-top:8px"><b>${TZS[z].n} ${TZS[z].s}</b> <span class="sub">— ${what || '일정 없음'}</span>${fix}</div>`;
   }).join('');
-  return `<div class="ttnote" style="margin:0 0 14px;line-height:1.55">같은 날짜가 시간대마다 따로 칸이 생겨서 이 날은 <b>${zones.length}칸</b>이에요. 비행기로 날짜를 넘거나, 일정이 다른 시간대로 저장되면 이렇게 돼요.${rows}</div>`;
+  return `<div class="ttnote" style="margin:0 0 14px;line-height:1.55">같은 날짜가 시간대마다 따로 칸이 생겨서 이 날은 <b>${nCols}칸</b>이에요. 비행기로 날짜를 넘거나, 일정이 다른 시간대로 저장되면 이렇게 돼요.${rows}</div>`;
 }
 function tripDates() {
   const set = new Set(S.plans.flatMap(p => [p.date, p.mv && p.mv.arrDate]).filter(Boolean));
@@ -799,7 +801,12 @@ const fmtM = m => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
 const DAYC = ['#F2668B', '#2E3A87', '#00876F', '#E8930C', '#7B61FF', '#0B8FD0'];
 function ttColumns() {
   const cols = new Map(), rides = [];
-  const add = (date, tz) => { const k = date + '|' + tz; if (!cols.has(k)) cols.set(k, { date, tz, items: [], allday: [], rides: [], carry: [] }); return cols.get(k); };
+  const off = (date, tz) => { try { const u = localToUTC(date, '12:00', tz); return Math.round(tzOffset(u, tz) / 6e4); } catch (e) { return tz; } };
+  const add = (date, tz) => {
+    const k = date + '|' + off(date, tz);
+    if (!cols.has(k)) cols.set(k, { date, tz, tzs: [], items: [], allday: [], rides: [], carry: [] });
+    const c = cols.get(k); if (!c.tzs.includes(tz)) c.tzs.push(tz); return c;
+  };
   for (const p of expandPlans()) {
     if (!p.date) continue;
     if (isTrip(p) && p.time && p.mv.arrTime) { add(p.date, tzOf(p)); add(p.mv.arrDate || p.date, p.mv.arrTz || tzOf(p)); rides.push(p); continue; }
@@ -849,13 +856,14 @@ function vTable() {
   if (ed) h += `<div class="ttnote">블록을 끌어 시간·날짜를 옮기고, 아래 손잡이로 길이를 바꿔요 · 30분 단위 · 빈 칸을 누르면 새 일정</div>`;
   const dupe = d => cols.filter(c => c.date === d).length > 1;
   // a column whose time zone matches none of that day's regions — usually a plan saved with the wrong time zone
-  const odd = c => { const l = dayRegs(c.date); return l.length > 0 && !l.some(r => r.tz === c.tz) && c.items.concat(c.allday).length > 0; };
+  const odd = c => { const l = dayRegs(c.date); return l.length > 0 && !l.some(r => c.tzs.includes(r.tz)) && c.items.concat(c.allday).length > 0; };
+  const colRegs = c => { const l = regionsAt(c.date, c.tz); if (l.length < 2 || !dupe(c.date)) return l; const m = l.filter(r => c.tzs.includes(r.tz)); return m.length ? m : l; };
   let axis = '';
   for (let m = TT_S; m <= TT_E; m += 60) axis += `<div class="lab" style="top:${(m - TT_S) / 30 * TT_H}px">${m === TT_E ? '24:00' : fmtM(m)}</div>`;
   const axisCol = r => `<div class="taxis ${r ? 'r' : ''}"><div class="thead"></div><div class="tallrow"><small>시간 미정</small></div><div class="tbody" style="height:${TT_N * TT_H}px">${axis}</div></div>`;
   let body = '';
   cols.forEach((c, ci) => {
-    const rl = regionsAt(c.date, c.tz), d = parseD(c.date), dn = dayNum(c.date);
+    const rl = colRegs(c), d = parseD(c.date), dn = dayNum(c.date);
     const blocks = layoutLanes([
       ...c.items.map(p => {
         const s = toMin(p.time); let e = isTrip(p) ? s + 30 : (p.end ? toMin(p.end) : s + 60);
@@ -889,7 +897,7 @@ function vTable() {
     const ac = rgColorFor(rl, c.tz);
     const all = c.allday.length ? `<button class="tall" data-a="plan-edit" data-id="${c.allday[0].id}" style="background:${ac}1F;color:${ac}">${c.allday[0]._src ? '↻ ' : ''}${esc(c.allday[0].title)}${c.allday.length > 1 ? ` +${c.allday.length - 1}` : ''}</button>` : '';
     body += `<div class="tcol">
-      <div class="thead" data-a="dr-edit" data-d="${c.date}" data-tz="${c.tz}" style="background:${rgFill(rl)}"><b>${d.getMonth() + 1}월 ${d.getDate()}일 (${WD[d.getDay()]})</b><span class="${dupe(c.date) ? 'dup' : ''}">${odd(c) ? '⚠ ' : ''}${esc(rgName(rl))} · ${TZS[c.tz].s}${dn && dn > 0 ? ` · D${dn}` : ''}</span></div>
+      <div class="thead" data-a="dr-edit" data-d="${c.date}" data-tz="${c.tz}" style="background:${rgFill(rl)}"><b>${d.getMonth() + 1}월 ${d.getDate()}일 (${WD[d.getDay()]})</b><span class="${dupe(c.date) ? 'dup' : ''}">${odd(c) ? '⚠ ' : ''}${esc(rgName(rl))} · ${[...new Set(c.tzs.map(z => TZS[z].s))].join('·')}${dn && dn > 0 ? ` · D${dn}` : ''}</span></div>
       <div class="tallrow">${all}</div>
       <div class="tbody" data-ci="${ci}" style="height:${TT_N * TT_H}px">${items}${now}</div></div>`;
   });
