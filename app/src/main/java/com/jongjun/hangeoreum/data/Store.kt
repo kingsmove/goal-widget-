@@ -285,6 +285,10 @@ object Store {
             }
         })
         root.put("dayNotes", JSONObject().apply { d.dayNotes.forEach { (k, v) -> put(k.toString(), v) } })
+        runCatching {
+            val ex = JSONObject(d.extras)
+            ex.keys().forEach { k -> if (!root.has(k)) root.put(k, ex.get(k)) }
+        }
         val n = d.notif
         root.put("notif", JSONObject().apply {
             put("events", n.events); put("lead", n.eventLeadMin); put("ddays", n.ddays)
@@ -413,10 +417,15 @@ object Store {
         val notes = root.optJSONObject("dayNotes")?.let { o ->
             o.keys().asSequence().mapNotNull { k -> k.toLongOrNull()?.let { it to o.getString(k) } }.toMap()
         } ?: emptyMap()
+        val known = setOf(
+            "v", "focusGuard", "goals", "sessions", "events", "timer", "theme", "routines",
+            "routineSkips", "notif", "subjects", "quotes", "dayNotes",
+        )
+        val extras = JSONObject().apply { root.keys().forEach { k -> if (k !in known) put(k, root.get(k)) } }
         return AppData(
             goals, sessions, events, timer, root.optBoolean("focusGuard", true), theme,
             routines = routines, routineSkips = skips, notif = notif,
-            subjects = subjects, quotes = quotes, dayNotes = notes,
+            subjects = subjects, quotes = quotes, dayNotes = notes, extras = extras.toString(),
         )
     }
 }

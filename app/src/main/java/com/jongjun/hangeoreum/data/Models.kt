@@ -164,4 +164,6 @@ data class AppData(
     val quotes: List<Quote> = emptyList(),
     /** one-line memo per day (epochDay -> text) for the daily planner */
     val dayNotes: Map<Long, String> = emptyMap(),
+    /** Top-level backup keys this app doesn't use yet (e.g. "scores" from the PC version), kept as-is. */
+    val extras: String = "{}",
 )

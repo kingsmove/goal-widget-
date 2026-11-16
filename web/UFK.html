@@ -104,6 +104,10 @@ label.f{display:block;font-size:13px;font-weight:600;color:var(--sub);margin:16p
 .gbar .lbl{position:relative;font-size:12px;font-weight:800;padding:0 9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
 .gbar .hdl{position:absolute;right:0;top:0;bottom:0;width:12px;cursor:ew-resize;display:grid;place-items:center}
 .gbar .hdl:after{content:"";width:3px;height:12px;border-radius:2px;background:rgba(255,255,255,.85)}
+.gtag{position:absolute;height:26px;display:flex;align-items:center;pointer-events:none;z-index:1}
+.gtag i{width:14px;height:1.5px;display:block}
+.gtag span{font-size:12px;font-weight:700;padding:3px 8px;border-radius:7px;white-space:nowrap;border:1.5px solid}
+.badge{display:inline-flex;align-items:center;gap:6px;background:var(--green);color:#fff;font-weight:800;padding:6px 12px;border-radius:12px;font-size:14px}
 /* planner timetable */
 .tt{display:grid;grid-template-columns:30px repeat(6,1fr);gap:2px}
 .tt .h{font-size:11px;color:var(--sub);text-align:center;line-height:20px}
@@ -139,7 +143,7 @@ const DEF_ITEMS = ["#3182F6","#00A6A6","#8B5CF6","#FF8A3D","#03B26C","#F25C8A","
 const DEF_YEARS = ["#3182F6","#00A6A6","#03B26C","#8B5CF6","#FF8A3D"];
 let D;
 
-function blank(){return {v:1,focusGuard:true,goals:[],sessions:[],events:[],timer:{goalId:null,running:false,sub:null,acc:0,startedAt:0,sessionStart:0},theme:{mode:0},routines:[],routineSkips:[],notif:{},subjects:[],quotes:[],dayNotes:{}}}
+function blank(){return {v:1,focusGuard:true,goals:[],sessions:[],events:[],timer:{goalId:null,running:false,sub:null,acc:0,startedAt:0,sessionStart:0},theme:{mode:0},routines:[],routineSkips:[],notif:{},subjects:[],quotes:[],dayNotes:{},scores:[]}}
 function normalize(d){
   const b = blank();
   for (const k of Object.keys(b)) if (d[k] === undefined || d[k] === null) d[k] = b[k];
@@ -267,7 +271,7 @@ function applyTheme(){
 }
 
 // ============================================================ navigation
-const VIEWS = [["home","홈","⌂"],["goals","목표","⚑"],["gantt","공정표","▤"],["calendar","캘린더","▦"],["planner","플래너","◷"],["quotes","좋은 말","❝"],["resume","이력서","☰"],["settings","설정","⚙"]];
+const VIEWS = [["home","홈","⌂"],["goals","목표","⚑"],["gantt","공정표","▤"],["calendar","캘린더","▦"],["planner","플래너","◷"],["scores","성적","↗"],["quotes","좋은 말","❝"],["resume","이력서","☰"],["settings","설정","⚙"]];
 let view = location.hash.slice(1) || "home";
 if (!VIEWS.some(v => v[0] === view)) view = "home";
 function go(v){ view = v; location.hash = v; render(); window.scrollTo(0, 0); }
@@ -276,7 +280,7 @@ function renderNav(){
 }
 function render(){
   applyTheme(); renderNav();
-  const v = {home:vHome, goals:vGoals, gantt:vGantt, calendar:vCalendar, planner:vPlanner, quotes:vQuotes, resume:vResume, settings:vSettings}[view];
+  const v = {home:vHome, goals:vGoals, gantt:vGantt, calendar:vCalendar, planner:vPlanner, scores:vScores, quotes:vQuotes, resume:vResume, settings:vSettings}[view];
   $("#view").innerHTML = v();
   if (view === "gantt") mountGantt();
 }
@@ -326,17 +330,74 @@ function toggleGoal(id){ const g = goalById(id); if (!g) return; g.done = !g.don
 
 // ============================================================ GOALS
 let goalTab = "PLAN";
+const cursor = {DAY: today(), WEEK: today(), MONTH: today(), YEAR: today()};
+function weekStart(d){ return d - ((dow(d) + 6) % 7); }
+/** [start, end, label] of the period the cursor points at */
+function periodOf(level){
+  const c = cursor[level], [y, m] = ymd(c);
+  if (level === "DAY") return [c, c, full(c)];
+  if (level === "WEEK"){ const ws = weekStart(c); return [ws, ws + 6, `${md(ws)} ~ ${md(ws + 6)} 주`]; }
+  if (level === "MONTH") return [mkDay(y, m, 1), mkDay(y, m, lastOfMonth(y, m)), `${y}년 ${m}월`];
+  return [mkDay(y, 1, 1), mkDay(y, 12, 31), `${y}년`];
+}
+function shiftCursor(level, n){
+  const c = cursor[level], [y, m, d] = ymd(c);
+  if (level === "DAY") cursor[level] = c + n;
+  else if (level === "WEEK") cursor[level] = c + 7 * n;
+  else if (level === "MONTH"){ let mm = m + n, yy = y; while (mm < 1){ mm += 12; yy--; } while (mm > 12){ mm -= 12; yy++; } cursor[level] = mkDay(yy, mm, 1); }
+  else cursor[level] = mkDay(y + n, 1, 1);
+  render();
+}
 function vGoals(){
-  const t = today(), all = D.goals.filter(g => g.level === goalTab);
-  const cur = all.filter(g => g.end >= t).sort((a,b) => (a.done - b.done) || a.end - b.end);
-  const past = all.filter(g => g.end < t).sort((a,b) => b.end - a.end);
-  const hints = {YEAR:"올해 이루고 싶은 큰 목표", MONTH:"몇 월까지 끝낼지 정하는 목표", PLAN:"특정 날까지 끝낼 일 · 시작일과 마감일을 직접 정해요", WEEK:"이번 주에 끝낼 단위", DAY:"오늘은 어디까지 할지"};
-  return `<div class="row"><h1 class="grow">목표</h1><button class="btn" onclick="newGoal(goalTab)">+ ${LEVELS[goalTab][0]} 목표</button></div>
+  const t = today();
+  const hints = {YEAR:"올해 이루고 싶은 큰 목표", MONTH:"그 달에 끝낼 목표", PLAN:"특정 날까지 끝낼 일 · 시작일과 마감일을 직접 정해요", WEEK:"그 주에 끝낼 단위", DAY:"그날 어디까지 할지"};
+  const head = `<div class="row"><h1 class="grow">목표</h1><button class="btn" onclick="newGoal(goalTab${goalTab === "PLAN" ? "" : ", null, periodOf(goalTab)[0]"})">+ ${LEVELS[goalTab][0]} 목표</button></div>
   <div class="seg" style="max-width:560px">${LEVEL_ORDER.map(l => `<button class="${l === goalTab ? "on" : ""}" onclick="goalTab='${l}';render()">${LEVELS[l][0]}</button>`).join("")}</div>
-  <p class="small muted">${hints[goalTab]}</p>
+  <p class="small muted">${hints[goalTab]}</p>`;
+
+  if (goalTab === "PLAN"){
+    const all = D.goals.filter(g => g.level === "PLAN");
+    const cur = all.filter(g => g.end >= t).sort((a,b) => (a.done - b.done) || a.end - b.end || a.start - b.start);
+    const past = all.filter(g => g.end < t).sort((a,b) => b.end - a.end);
+    return head + `<div class="grid g2" style="margin-top:12px">${cur.map(goalCard).join("") || '<div class="card"><div class="empty">아직 없어요 · 오른쪽 위 버튼으로 추가해보세요</div></div>'}</div>
+    ${past.length ? `<h3 style="margin:28px 0 12px" class="muted">지난 계획 ${past.length}개</h3><div class="grid g2">${past.map(goalCard).join("")}</div>` : ""}`;
+  }
+
+  const [ps, pe, label] = periodOf(goalTab);
+  const inPeriod = g => g.start <= pe && g.end >= ps;
+  // goals of this level in the period + the day to-dos inside the period
+  const levelGoals = D.goals.filter(g => g.level === goalTab && inPeriod(g)).sort((a,b) => (a.done - b.done) || a.end - b.end || a.createdAt - b.createdAt);
+  const todos = goalTab === "DAY" ? levelGoals : D.goals.filter(g => g.level === "DAY" && g.end >= ps && g.end <= pe);
+  const items = goalTab === "DAY" ? todos : levelGoals.concat(todos);
+  const doneN = items.filter(g => progress(g) >= 1).length, total = items.length;
+  const achieved = total > 0 && doneN === total;
+  const isNow = ps <= t && t <= pe;
+  const word = {DAY:"오늘", WEEK:"이번 주", MONTH:"이번 달", YEAR:"올해"}[goalTab], unit = {DAY:"이 날", WEEK:"이 주", MONTH:"이 달", YEAR:"이 해"}[goalTab];
+
+  let body = "";
+  if (goalTab === "DAY"){
+    body = `<div class="card">${todos.map(g => goalRow(g)).join("") || '<div class="empty">이 날 할 일이 없어요</div>'}</div>`;
+  } else {
+    body = `${levelGoals.length ? `<div class="grid g2">${levelGoals.map(goalCard).join("")}</div>` : `<div class="card"><div class="empty">${unit} ${LEVELS[goalTab][0]} 목표가 없어요</div></div>`}`;
+    if (goalTab === "WEEK"){
+      let days = "";
+      for (let d = ps; d <= pe; d++){
+        const dg = dayGoals(d), ok = dg.length && dg.every(g => g.done);
+        days += `<div class="card" style="padding:16px"><div class="row" style="margin-bottom:6px"><b class="grow" style="${d === t ? "color:var(--blue)" : ""}">${full(d)}</b>${ok ? '<span style="color:var(--green);font-weight:900">✓</span>' : `<span class="small muted">${dg.filter(g => g.done).length}/${dg.length}</span>`}<button class="link" onclick="editGoal(null,'DAY',null,${d})">+</button></div>${dg.map(g => goalRow(g)).join("") || '<div class="small ter">-</div>'}</div>`;
+      }
+      body += `<h3 style="margin:22px 0 12px">요일별 할 일</h3><div class="grid g3">${days}</div>`;
+    }
+  }
+  return head + `
+  <div class="card" style="margin-top:12px;${achieved ? "background:" + alpha("#03B26C", .1) : ""}"><div class="row" style="flex-wrap:wrap">
+    <button class="chip" onclick="shiftCursor('${goalTab}',-1)">‹</button><b style="font-size:19px;min-width:170px;text-align:center">${label}</b><button class="chip" onclick="shiftCursor('${goalTab}',1)">›</button>
+    ${isNow ? "" : `<button class="chip" onclick="cursor['${goalTab}']=today();render()">${word}</button>`}
+    <span class="grow"></span>
+    ${achieved ? `<span class="badge">🎉 ${isNow ? word : unit} 목표 달성</span>` : `<span class="muted">${goalTab === "DAY" ? "할 일" : "목표·할 일"} <b style="color:var(--text)">${doneN} / ${total}</b></span>`}
+  </div>${total ? `<div style="margin-top:12px">${bar(total ? doneN / total : 0, achieved ? "var(--green)" : "var(--blue)")}</div>` : ""}
+  ${goalTab !== "DAY" && todos.length ? `<div class="small muted" style="margin-top:8px">${unit} 할 일 ${todos.filter(g => g.done).length}/${todos.length}개 완료</div>` : ""}</div>
   ${goalTab === "DAY" ? routineCard() : ""}
-  <div class="grid g2" style="margin-top:12px">${cur.map(goalCard).join("") || '<div class="card"><div class="empty">아직 없어요 · 오른쪽 위 버튼으로 추가해보세요</div></div>'}</div>
-  ${past.length ? `<h3 style="margin:28px 0 12px" class="muted">지난 목표 ${past.length}개</h3><div class="grid g2">${past.map(goalCard).join("")}</div>` : ""}`;
+  <div style="margin-top:14px">${body}</div>`;
 }
 function goalCard(g){
   const p = progress(g), c = goalColor(g), kids = children(g.id), par = goalById(g.parentId);
@@ -379,7 +440,7 @@ function delGoal(id){
   if (rm.has(D.timer.goalId)) D.timer.goalId = null;
   closeModal(); commit();
 }
-function newGoal(level, parentId){ editGoal(null, level, parentId); }
+function newGoal(level, parentId, baseDay){ editGoal(null, level, parentId, baseDay); }
 function swatchRow(name, selIdx, custom, allowDefault){
   const p = itemColors();
   return `<div class="swatches" data-name="${name}">${allowDefault ? `<button type="button" class="chip ${selIdx < 0 && custom == null ? "on" : ""}" data-idx="-1">기본</button>` : ""}
@@ -397,9 +458,9 @@ function bindSwatches(root, state){
     ci.addEventListener("input", () => { state.cc = toInt(ci.value); box.querySelectorAll(".on").forEach(x => x.classList.remove("on")); ci.parentElement.classList.add("on"); ci.parentElement.style.background = ci.value; });
   });
 }
-function editGoal(id, level, parentId){
+function editGoal(id, level, parentId, baseDay){
   const g = id ? goalById(id) : null;
-  const t = today();
+  const t = baseDay ?? today();
   const lv = g ? g.level : (level || "PLAN");
   const [s0, e0] = g ? [g.start, g.end] : defaultRange(lv, t);
   const pid = g ? g.parentId : (parentId || null);
@@ -534,7 +595,8 @@ function mountGantt(){
     const x = pos(r.start), w = Math.max(14, pos(r.end + 1) - x), ev = r.kind === "e", p = r.p ?? (r.done ? 1 : 0);
     return `<div class="gbar" data-i="${i}" style="left:${x}px;top:${i * RH + 14}px;width:${w}px;background:${ev ? alpha(r.color, r.done ? .45 : .88) : alpha(r.color, r.done ? .35 : .2)}">
       ${ev ? "" : `<div class="fillp" style="width:${pct(p)}%;background:${alpha(r.color, r.done ? .6 : .88)}"></div>`}
-      <span class="lbl" style="color:${ev || p > .3 ? "#fff" : r.color}">${ev ? esc(r.title) : pct(p) + "%"}</span><span class="hdl"></span></div>`;
+      <span class="lbl" style="color:${ev || p > .3 ? "#fff" : r.color}">${w < 110 ? "" : ev ? esc(r.title) : pct(p) + "%"}</span><span class="hdl"></span></div>`
+      + (w < 110 ? `<div class="gtag" style="left:${x + w}px;top:${i * RH + 14}px"><i style="background:${r.color}"></i><span style="color:${r.color};border-color:${alpha(r.color,.5)};background:var(--card)">${esc(r.title)} · ${r.start === r.end ? md(r.start) : span(r.start, r.end)}${ev ? "" : " · " + pct(p) + "%"}</span></div>` : "");
   }).join("");
   const names = rows.map(r => `<div class="grow-h" style="padding-left:${12 + r.depth * 14}px" data-open="${r.kind}:${r.ref.id}"><span style="width:3px;height:26px;border-radius:2px;background:${r.color};flex-shrink:0"></span><div style="min-width:0"><div style="font-weight:${r.depth ? 500 : 700};font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${r.done ? "color:var(--ter)" : ""}">${esc(r.title)}</div><div class="tiny ter">${r.label}</div></div></div>`).join("");
   $("#gantt").innerHTML = `<div class="gnames"><div class="ghead" style="display:flex;align-items:center;padding-left:14px;font-weight:700;color:var(--sub);font-size:13px">항목</div>${names || `<div class="grow-h ter small">비어 있어요</div>`}</div>
@@ -580,7 +642,8 @@ function vCalendar(){
     let cells = "";
     for (let i = 0; i < 7; i++){
       const d = ws + i, [, dm, dd] = ymd(d), singles = D.events.filter(e => !((e.endDay ?? e.day) > e.day) && e.day === d), gs2 = dayGoals(d).length;
-      cells += `<div class="dcell ${dm !== m ? "out" : ""} ${d === calSel ? "sel" : ""}" style="position:relative;min-height:${44 + 19 * Math.min(lanes.length, 3) + 22}px" onclick="calSel=${d};render()"><div class="dnum ${d === t ? "today" : ""}" style="${i === 0 && d !== t ? "color:var(--red)" : ""}">${dd}</div>
+      const dg = dayGoals(d), allDone = dg.length && dg.every(g => g.done);
+      cells += `<div class="dcell ${dm !== m ? "out" : ""} ${d === calSel ? "sel" : ""}" style="position:relative;min-height:${44 + 19 * Math.min(lanes.length, 3) + 22}px" onclick="calSel=${d};render()"><div class="dnum ${d === t ? "today" : ""}" style="${i === 0 && d !== t ? "color:var(--red)" : ""}">${dd}</div>${allDone ? '<span title="할 일 다 했어요" style="position:absolute;top:6px;right:8px;color:var(--green);font-weight:900;font-size:13px">✓</span>' : ""}
         <div class="cdots">${singles.slice(0,4).map(e => `<span class="dot" style="width:6px;height:6px;background:${eventColor(e)}"></span>`).join("")}${gs2 ? '<span class="dot" style="width:6px;height:6px;background:var(--ter)"></span>' : ""}</div></div>`;
     }
     const bars = segs.map(([e, s, en, l]) => { const c = eventColor(e); return `<div class="cbar" style="left:calc(${(s - ws) / 7 * 100}% + 3px);width:calc(${(en - s + 1) / 7 * 100}% - 6px);top:${36 + l * 19}px;background:${alpha(c,.18)};color:${c}" onclick="event.stopPropagation();editEvent('${e.id}')">${s === e.day || s === ws ? esc(e.title) : ""}</div>`; }).join("");
@@ -593,7 +656,7 @@ function vCalendar(){
       <button class="chip" onclick="calMonth=[...ymd(today())].slice(0,2);calSel=today();render()">오늘</button>
       <button class="chip" onclick="calShift(-1)">‹</button><button class="chip" onclick="calShift(1)">›</button></div>
       <div class="cal">${DOW.map((d,i) => `<div class="dow" style="${i === 0 ? "color:var(--red)" : i === 6 ? "color:var(--blue)" : ""}">${d}</div>`).join("")}</div>${html}</div>
-    <div class="card"><h3>${rel(calSel) === full(calSel) ? full(calSel) : rel(calSel) + " · " + full(calSel)}<button class="link act" onclick="editEvent(null, calSel)">+ 일정</button></h3>
+    <div class="card"><h3>${rel(calSel) === full(calSel) ? full(calSel) : rel(calSel) + " · " + full(calSel)}<span class="act row" style="gap:6px"><button class="link" onclick="editGoal(null,'DAY',null,calSel)">+ 할 일</button><button class="link" onclick="editEvent(null, calSel)">+ 일정</button></span></h3>
       ${evs.map(e => { const c = eventColor(e), r = (e.endDay ?? e.day) > e.day; return `<div class="item" onclick="editEvent('${e.id}')"><span style="width:4px;height:36px;border-radius:2px;background:${c}"></span><div class="grow"><b>${esc(e.title)}</b><div class="small muted">${r ? span(e.day, e.endDay) + ` · ${calSel - e.day + 1}/${e.endDay - e.day + 1}일차` : minuteLabel(e.minute)}${e.memo ? " · " + esc(e.memo) : ""}</div></div></div>`; }).join("")}
       ${todos.length ? `<div class="small muted" style="margin:12px 0 4px;font-weight:700">할 일</div>${todos.map(g => goalRow(g)).join("")}` : ""}
       ${!evs.length && !todos.length ? '<div class="empty">일정이 없어요</div>' : ""}
@@ -626,7 +689,8 @@ function vPlanner(){
     }
   }
   const goals = D.goals.filter(g => !g.done && g.end >= t);
-  return `<div class="row"><h1 class="grow">데일리 플래너</h1><button class="chip" onclick="planDay--;render()">‹</button><b style="min-width:150px;text-align:center">${full(d)}</b><button class="chip" onclick="if(planDay<today()){planDay++;render()}">›</button>${d !== t ? '<button class="chip" onclick="planDay=today();render()">오늘</button>' : ""}</div>
+  const scores = (D.scores || []).filter(x => x.day === d);
+  return `<div class="row"><h1 class="grow">데일리 플래너${d > t ? ' <span class="pill">계획 중</span>' : ""}</h1><button class="chip" onclick="planDay--;render()">‹</button><b style="min-width:150px;text-align:center">${full(d)}</b><button class="chip" onclick="planDay++;render()">›</button>${d !== t ? '<button class="chip" onclick="planDay=today();render()">오늘</button>' : ""}</div>
   <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start">
     <div class="grid">
       <div class="card"><h3>타이머 <span class="act small muted">${T.running ? "집중하는 중" : timerActive() ? "일시정지됨" : ""}</span></h3>
@@ -638,12 +702,15 @@ function vPlanner(){
       <div class="card"><div class="row"><span class="muted grow">총 공부</span><span class="big" style="font-variant-numeric:tabular-nums">${clock(total)}</span></div></div>
       <div class="card"><h3>과목별 <button class="link act" onclick="editSubjects()">과목 관리</button></h3>
         ${gl.map(([k, v]) => `<div style="padding:7px 0"><div class="row"><span class="dot" style="background:${v.c}"></span><span class="grow" style="font-weight:600">${esc(k)}</span><b class="small">${dur(v.ms)}</b></div><div style="margin-top:6px">${bar(v.ms / top, v.c, 6)}</div></div>`).join("") || '<div class="empty">공부 기록이 없어요</div>'}</div>
-      <div class="card"><h3>할 일 <button class="link act" onclick="editGoal(null,'DAY')">+ 추가</button></h3>${dayGoals(d).map(g => goalRow(g)).join("") || '<div class="empty">이 날 할 일이 없어요</div>'}</div>
+      <div class="card"><h3>할 일 <button class="link act" onclick="editGoal(null,'DAY',null,planDay)">+ 추가</button></h3>${dayGoals(d).map(g => goalRow(g)).join("") || '<div class="empty">이 날 할 일이 없어요</div>'}</div>
       <div class="card"><h3>오늘의 한 줄</h3><textarea id="dayNote" placeholder="오늘 공부 어땠어요?" onchange="setNote(${d}, this.value)">${esc(D.dayNotes[d] || "")}</textarea></div>
     </div>
     <div class="grid">
       <div class="card"><h3>타임테이블 <button class="link act" onclick="manualSession()">+ 직접 기록</button></h3><div class="tt">${tt}</div><div class="tiny ter" style="margin-top:8px">10분 칸마다 3분 넘게 공부하면 그 과목 색으로 칠해져요</div></div>
       <div class="card"><h3>기록</h3>${ss.map(s => `<div class="item" onclick="${s.id === "running" ? "" : `delSession('${s.id}')`}"><span style="width:4px;height:30px;border-radius:2px;background:${sessionColor(s)}"></span><div class="grow"><b>${esc(sessionLabel(s))}${s.id === "running" ? " · 측정 중" : ""}</b><div class="small muted">${hm(s.start)} – ${hm(s.start + s.dur)}</div></div><b class="small">${dur(s.dur)}</b></div>`).join("") || '<div class="empty">타이머를 쓰거나 ‘직접 기록’으로 추가해요</div>'}</div>
+      <div class="card"><h3>오늘의 성적 <button class="link act" onclick="editScore(null, planDay)">+ 성적 입력</button></h3>
+        ${scores.map(x => `<div class="item" onclick="editScore('${x.id}')"><span class="dot" style="background:${scoreColor(x.name)}"></span><b class="grow">${esc(x.name)}</b><b style="font-size:18px">${x.score}${x.max ? `<span class="small muted"> / ${x.max}</span>` : ""}</b></div>`).join("") || '<div class="empty">모의고사·기출·토익 점수 등을 적으면 성적 탭에서 그래프로 볼 수 있어요</div>'}
+        ${scores.length ? '<button class="link" style="margin-top:8px" onclick="go(\'scores\')">그래프 보기 →</button>' : ""}</div>
     </div>
   </div>`;
 }
@@ -671,6 +738,67 @@ function editSubjects(){
   $("#sAdd").onclick = () => { const n = $("#sName").value.trim(); if (!n) return; D.subjects.push({id:uid(), name:n, color: st.cc ?? toInt(itemColors()[Math.max(0, st.idx)])}); save(); render(); editSubjects(); };
 }
 function delSubject(id){ D.subjects = D.subjects.filter(s => s.id !== id); if (D.timer.sub === id) D.timer.sub = null; save(); render(); editSubjects(); }
+
+// ============================================================ SCORES
+const scoreNames = () => [...new Set((D.scores || []).slice().sort((a,b) => b.day - a.day).map(x => x.name))];
+function scoreColor(name){ const n = scoreNames().slice().sort(), p = itemColors(); return p[Math.max(0, n.indexOf(name)) % p.length]; }
+let scoreSel = null;
+function editScore(id, day){
+  const x = id ? D.scores.find(s => s.id === id) : null;
+  modal(`<h2>${x ? "성적 수정" : "성적 입력"}</h2><div class="small muted">${full(x ? x.day : day)}</div>
+    <label class="f">시험 이름</label><input id="scName" list="scList" value="${esc(x ? x.name : scoreSel || "")}" placeholder="예: 건축기사 모의고사, 토익, 기출 2023-1"><datalist id="scList">${scoreNames().map(n => `<option value="${esc(n)}">`).join("")}</datalist>
+    <div class="grid g2"><div><label class="f">점수</label><input id="scVal" type="number" step="any" value="${x ? x.score : ""}"></div><div><label class="f">만점 (선택)</label><input id="scMax" type="number" step="any" value="${x && x.max ? x.max : ""}" placeholder="예: 100, 990"></div></div>
+    <label class="f">날짜</label><input type="date" id="scDay" value="${iso(x ? x.day : day)}">
+    <label class="f">메모</label><input id="scMemo" value="${esc(x ? x.memo || "" : "")}" placeholder="예: 법규 파트 약함">
+    <div class="acts">${x ? '<button class="btn2 danger" id="scDel">삭제</button>' : '<button class="btn2" onclick="closeModal()">취소</button>'}<button class="btn" id="scSave">저장</button></div>`);
+  $("#scName").focus();
+  $("#scSave").onclick = () => {
+    const name = $("#scName").value.trim(), score = parseFloat($("#scVal").value);
+    if (!name || isNaN(score)) return toast("시험 이름과 점수를 적어주세요");
+    const max = parseFloat($("#scMax").value);
+    const o = Object.assign(x || {id:uid(), createdAt:Date.now()}, {name, score, max: isNaN(max) ? null : max, day: fromIso($("#scDay").value) ?? day, memo:$("#scMemo").value.trim()});
+    if (!x) D.scores.push(o);
+    scoreSel = name; closeModal(); commit();
+  };
+  if (x) $("#scDel").onclick = () => { D.scores = D.scores.filter(s => s.id !== x.id); closeModal(); commit(); };
+}
+function scoreChart(list, color){
+  if (!list.length) return "";
+  const W = 760, H = 280, L = 44, R = 18, T = 18, B = 34;
+  const pctMode = list.every(x => x.max);
+  const val = x => pctMode ? x.score / x.max * 100 : x.score;
+  const vs = list.map(val), lo0 = Math.min(...vs), hi0 = Math.max(...vs);
+  const pad = (hi0 - lo0) * .15 || Math.max(1, hi0 * .1);
+  const lo = pctMode ? Math.max(0, Math.floor((lo0 - pad) / 10) * 10) : lo0 - pad, hi = pctMode ? Math.min(100, Math.ceil((hi0 + pad) / 10) * 10) : hi0 + pad;
+  const d0 = list[0].day, d1 = list[list.length - 1].day, dx = Math.max(1, d1 - d0);
+  const X = d => list.length === 1 ? (L + W - R) / 2 : L + (d - d0) / dx * (W - L - R), Y = v => T + (1 - (v - lo) / (hi - lo || 1)) * (H - T - B);
+  let grid = "";
+  for (let k = 0; k <= 4; k++){ const v = lo + (hi - lo) * k / 4, y = Y(v); grid += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L - 8}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--sub)">${Math.round(v * 10) / 10}${pctMode ? "%" : ""}</text>`; }
+  const pts = list.map(x => [X(x.day), Y(val(x))]);
+  const path = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
+  const area = path + ` L${pts[pts.length - 1][0]} ${H - B} L${pts[0][0]} ${H - B} Z`;
+  const dots = list.map((x, i) => `<g style="cursor:pointer" onclick="editScore('${x.id}')"><circle cx="${pts[i][0]}" cy="${pts[i][1]}" r="5" fill="var(--card)" stroke="${color}" stroke-width="2.5"/><text x="${pts[i][0]}" y="${pts[i][1] - 11}" text-anchor="middle" font-size="12" font-weight="700" fill="var(--text)">${x.score}</text><text x="${pts[i][0]}" y="${H - 12}" text-anchor="middle" font-size="11" fill="var(--sub)">${md(x.day)}</text></g>`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">${grid}<path d="${area}" fill="${alpha(color, .12)}"/><path d="${path}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round"/>${dots}</svg>${pctMode ? '<div class="tiny ter">만점 대비 % 로 그렸어요</div>' : ""}`;
+}
+function vScores(){
+  const names = scoreNames();
+  if (!scoreSel || !names.includes(scoreSel)) scoreSel = names[0] || null;
+  const list = (D.scores || []).filter(x => x.name === scoreSel).sort((a,b) => a.day - b.day || a.createdAt - b.createdAt);
+  const c = scoreSel ? scoreColor(scoreSel) : accent();
+  const last = list[list.length - 1], best = list.reduce((m, x) => !m || x.score > m.score ? x : m, null);
+  const avg = list.length ? list.reduce((s, x) => s + x.score, 0) / list.length : 0;
+  const diff = list.length > 1 ? last.score - list[list.length - 2].score : null;
+  return `<div class="row"><h1 class="grow">성적</h1><button class="btn" onclick="editScore(null, today())">+ 성적 입력</button></div>
+  ${names.length ? `<div class="row" style="flex-wrap:wrap;margin-bottom:14px">${names.map(n => `<button class="chip ${n === scoreSel ? "on" : ""}" style="${n === scoreSel ? "background:" + scoreColor(n) : ""}" onclick="scoreSel=${JSON.stringify(n).replace(/"/g, "&quot;")};render()">${esc(n)}</button>`).join("")}</div>
+  <div class="grid g3">
+    <div class="card"><div class="small muted">최근</div><div class="big">${last.score}${last.max ? `<span class="small muted"> / ${last.max}</span>` : ""}</div><div class="small ${diff == null ? "ter" : diff >= 0 ? "" : ""}" style="color:${diff == null ? "var(--ter)" : diff >= 0 ? "var(--green)" : "var(--red)"};font-weight:700">${diff == null ? full(last.day) : (diff >= 0 ? "▲ " : "▼ ") + Math.abs(Math.round(diff * 10) / 10) + " 지난번보다"}</div></div>
+    <div class="card"><div class="small muted">최고</div><div class="big">${best.score}</div><div class="small ter">${full(best.day)}</div></div>
+    <div class="card"><div class="small muted">평균 · ${list.length}회</div><div class="big">${Math.round(avg * 10) / 10}</div></div>
+  </div>
+  <div class="card" style="margin-top:14px">${scoreChart(list, c)}</div>
+  <div class="card" style="margin-top:14px"><h3>기록</h3>${list.slice().reverse().map(x => `<div class="item" onclick="editScore('${x.id}')"><span class="small muted" style="width:120px">${full(x.day)}</span><b class="grow">${x.score}${x.max ? `<span class="small muted"> / ${x.max}</span>` : ""}</b><span class="small muted">${esc(x.memo || "")}</span></div>`).join("")}</div>`
+  : '<div class="card"><div class="empty">플래너나 여기서 성적을 입력하면 시험별로 그래프가 그려져요</div></div>'}`;
+}
 
 // ============================================================ QUOTES
 function vQuotes(){
