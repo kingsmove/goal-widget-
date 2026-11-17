@@ -552,7 +552,18 @@ function editEvent(id, presetDay, presetPlan){
 }
 
 // ============================================================ GANTT
-const G = {monthW:90, week:false, long:false, events:true, done:true};
+const G = {monthW:90, week:false, long:false, events:true, done:true, flat:false};
+/** Grouped view: one row per kind (자격증, 대외활동 …); every item sits on that row in time order. */
+function ganttGroups(rows){
+  const order = [["g:PLAN","계획"],["g:YEAR","연간 목표"],["g:MONTH","월간 목표"],["g:WEEK","주간 목표"],["e:3","자격증"],["e:4","어학"],["e:5","대외활동"],["e:1","근무·인턴"],["e:2","학업"],["e:6","공모전·프로젝트"],["e:7","마일스톤"],["e:0","일정"]];
+  const key = r => r.kind === "g" ? "g:" + r.ref.level : "e:" + (r.ref.type || 0);
+  return order.map(([k, title]) => {
+    const items = rows.filter(r => key(r) === k).sort((a,b) => a.start - b.start || a.end - b.end);
+    const color = k.startsWith("e:") && k !== "e:0" ? toHex(KINDS[+k.slice(2)][2]) : items[0] ? items[0].color : accent();
+    return {title, items, color};
+  }).filter(g => g.items.length);
+}
+const textW = t => [...t].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 12.5 : 7.2), 0) + 26;
 function ganttRows(){
   const t = today(), lv = new Set(["PLAN"]); if (G.long){ lv.add("YEAR"); lv.add("MONTH"); } if (G.week) lv.add("WEEK");
   const shown = D.goals.filter(g => lv.has(g.level) && (G.done || !g.done)), ids = new Set(shown.map(g => g.id)), rows = [];
@@ -566,6 +577,7 @@ function ganttRows(){
 function vGantt(){
   return `<div class="row"><h1 class="grow">공정표</h1><button class="btn2" onclick="editEvent(null, null, true)">+ 플랜 일정</button><button class="btn" onclick="newGoal('PLAN')">+ 계획</button></div>
   <div class="row" style="flex-wrap:wrap;margin-bottom:12px">
+    <button class="chip ${G.flat ? "on" : ""}" onclick="G.flat=!G.flat;render()">펼쳐 보기</button>
     ${[["events","플랜 일정"],["long","연간·월간"],["week","주간 목표"],["done","지난·완료"]].map(([k,l]) => `<button class="chip ${G[k] ? "on" : ""}" onclick="G.${k}=!G.${k};render()">${l}</button>`).join("")}
     <span class="grow"></span><span class="small muted">막대 클릭: 수정 · 끌기: 기간 이동 · 오른쪽 끝 끌기: 끝나는 날 변경</span>
     <button class="chip" onclick="G.monthW=Math.max(40,G.monthW-20);render()">−</button><button class="chip" onclick="G.monthW=Math.min(220,G.monthW+20);render()">+</button></div>
@@ -579,7 +591,7 @@ function mountGantt(){
   let months = (ly - fy) * 12 + (lm - fm) + 1; if (months < 12) months = 12; months = Math.min(months, 120);
   const mw = G.monthW, RH = 54;
   const pos = day => { const [y,m,d] = ymd(day); return ((y - fy) * 12 + (m - fm) + (d - 1) / lastOfMonth(y, m)) * mw; };
-  const W = months * mw, H = Math.max(rows.length, 1) * RH;
+  const W = months * mw;
   let head = "", grid = "";
   for (let i = 0; i < months; ){
     const y = fy + Math.floor((fm - 1 + i) / 12), m = (fm - 1 + i) % 12 + 1, n = Math.min(12 - m + 1, months - i), c = yearColors()[((y % 5) + 5) % 5];
@@ -590,18 +602,56 @@ function mountGantt(){
     head += `<div style="position:absolute;left:${i * mw}px;width:${mw}px;top:26px;height:32px;display:grid;place-items:center;font-size:12px;font-weight:${now ? 800 : 600};color:${now ? "var(--blue)" : "var(--sub)"}">${m}월</div>`;
     grid += `<div style="position:absolute;left:${i * mw}px;top:0;bottom:0;width:1px;background:${m === 1 ? "var(--line)" : alpha("#8B95A1",.15)}"></div>`;
   }
-  rows.forEach((r, i) => grid += `<div style="position:absolute;left:0;right:0;top:${(i + 1) * RH - 1}px;height:1px;background:var(--fill)"></div>`);
-  grid += `<div style="position:absolute;left:${pos(t)}px;top:0;bottom:0;width:2px;background:${alpha("#F04452",.6)};z-index:2"></div>`;
-  const bars = rows.map((r, i) => {
+  // ---- layout: list of row blocks; each bar knows its item index and y
+  const items = [], blocks = [];
+  const barHtml = (r, idx, y, labelInside) => {
     const x = pos(r.start), w = Math.max(14, pos(r.end + 1) - x), ev = r.kind === "e", p = r.p ?? (r.done ? 1 : 0);
-    return `<div class="gbar" data-i="${i}" style="left:${x}px;top:${i * RH + 14}px;width:${w}px;background:${ev ? alpha(r.color, r.done ? .45 : .88) : alpha(r.color, r.done ? .35 : .2)}">
+    return `<div class="gbar" data-i="${idx}" style="left:${x}px;top:${y}px;width:${w}px;background:${ev ? alpha(r.color, r.done ? .45 : .88) : alpha(r.color, r.done ? .35 : .2)}">
       ${ev ? "" : `<div class="fillp" style="width:${pct(p)}%;background:${alpha(r.color, r.done ? .6 : .88)}"></div>`}
-      <span class="lbl" style="color:${ev || p > .3 ? "#fff" : r.color}">${w < 110 ? "" : ev ? esc(r.title) : pct(p) + "%"}</span><span class="hdl"></span></div>`
-      + (w < 110 ? `<div class="gtag" style="left:${x + w}px;top:${i * RH + 14}px"><i style="background:${r.color}"></i><span style="color:${r.color};border-color:${alpha(r.color,.5)};background:var(--card)">${esc(r.title)} · ${r.start === r.end ? md(r.start) : span(r.start, r.end)}${ev ? "" : " · " + pct(p) + "%"}</span></div>` : "");
-  }).join("");
-  const names = rows.map(r => `<div class="grow-h" style="padding-left:${12 + r.depth * 14}px" data-open="${r.kind}:${r.ref.id}"><span style="width:3px;height:26px;border-radius:2px;background:${r.color};flex-shrink:0"></span><div style="min-width:0"><div style="font-weight:${r.depth ? 500 : 700};font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${r.done ? "color:var(--ter)" : ""}">${esc(r.title)}</div><div class="tiny ter">${r.label}</div></div></div>`).join("");
-  $("#gantt").innerHTML = `<div class="gnames"><div class="ghead" style="display:flex;align-items:center;padding-left:14px;font-weight:700;color:var(--sub);font-size:13px">항목</div>${names || `<div class="grow-h ter small">비어 있어요</div>`}</div>
-    <div class="gscroll" id="gscroll"><div style="width:${W}px"><div class="ghead">${head}</div><div style="position:relative;height:${H}px" id="gbody">${grid}${bars}${rows.length ? "" : `<div style="position:absolute;left:${pos(t) + 14}px;top:18px" class="small muted">‘+ 계획’으로 언제까지 끝낼 일을 추가하면 여기에 막대로 나와요</div>`}</div></div></div>`;
+      <span class="lbl" style="color:${ev || p > .3 ? "#fff" : r.color}">${labelInside && w >= 110 ? (ev ? esc(r.title) : pct(p) + "%") : ""}</span><span class="hdl"></span></div>`;
+  };
+  const tagText = r => `${esc(r.title)} · ${r.start === r.end ? md(r.start) : span(r.start, r.end)}${r.kind === "g" ? " · " + pct(r.p ?? 0) + "%" : ""}`;
+  let bodyHtml = "", namesHtml = "", y0 = 0;
+  if (G.flat){
+    rows.forEach((r, i) => {
+      items.push(r);
+      const x = pos(r.start), w = Math.max(14, pos(r.end + 1) - x);
+      bodyHtml += barHtml(r, i, y0 + 14, true) + (w < 110 ? `<div class="gtag" style="left:${x + w}px;top:${y0 + 14}px"><i style="background:${r.color}"></i><span style="color:${r.color};border-color:${alpha(r.color,.5)};background:var(--card)">${tagText(r)}</span></div>` : "");
+      namesHtml += `<div class="grow-h" style="height:${RH}px;padding-left:${12 + r.depth * 14}px" data-open="${r.kind}:${r.ref.id}"><span style="width:3px;height:26px;border-radius:2px;background:${r.color};flex-shrink:0"></span><div style="min-width:0"><div style="font-weight:${r.depth ? 500 : 700};font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${r.done ? "color:var(--ter)" : ""}">${esc(r.title)}</div><div class="tiny ter">${r.label}</div></div></div>`;
+      y0 += RH; bodyHtml += `<div style="position:absolute;left:0;right:0;top:${y0 - 1}px;height:1px;background:var(--fill)"></div>`;
+    });
+  } else {
+    ganttGroups(rows).forEach(g => {
+      const barY = y0 + 12, BH = 26, lineEnds = [];
+      // labels under the bar, pushed to the next line when they would collide
+      let labels = "";
+      g.items.forEach(r => {
+        const idx = items.push(r) - 1;
+        bodyHtml += barHtml(r, idx, barY, false);
+        const x = Math.max(0, pos(r.start)), tw = textW(r.title + " · " + (r.start === r.end ? md(r.start) : span(r.start, r.end)) + (r.kind === "g" ? " · 100%" : ""));
+        let line = lineEnds.findIndex(e => e + 6 <= x); if (line < 0){ lineEnds.push(0); line = lineEnds.length - 1; }
+        lineEnds[line] = x + tw;
+        labels += `<div class="gtag" data-i="${idx}" style="left:${x}px;top:${barY + BH + 6 + line * 24}px;pointer-events:auto;cursor:pointer;height:22px"><span style="color:${r.color};border-color:${alpha(r.color,.45)};background:var(--card);${r.done ? "opacity:.6" : ""}">${tagText(r)}</span></div>`;
+      });
+      // overlapping stretches: blend the colors of everything that runs at the same time
+      const cuts = [...new Set(g.items.flatMap(r => [r.start, r.end + 1]))].sort((a,b) => a - b);
+      for (let k = 0; k < cuts.length - 1; k++){
+        const a = cuts[k], z = cuts[k + 1], on = g.items.filter(r => r.start < z && r.end + 1 > a);
+        if (on.length < 2) continue;
+        const cols = on.map(r => r.color), x1 = pos(a), x2 = pos(z);
+        bodyHtml += `<div style="position:absolute;left:${x1}px;width:${Math.max(3, x2 - x1)}px;top:${barY}px;height:${BH}px;background:linear-gradient(90deg,${cols.join(",")});pointer-events:none;z-index:1;opacity:.95" title="겹침"></div>`;
+      }
+      const h = BH + 12 + 6 + Math.max(1, lineEnds.length) * 24 + 10;
+      bodyHtml += labels;
+      namesHtml += `<div class="grow-h" style="height:${h}px;align-items:flex-start;padding-top:14px;cursor:default"><span style="width:3px;height:26px;border-radius:2px;background:${g.color};flex-shrink:0"></span><div><div style="font-weight:800;font-size:15px">${g.title}</div><div class="tiny ter">${g.items.length}개</div></div></div>`;
+      y0 += h; bodyHtml += `<div style="position:absolute;left:0;right:0;top:${y0 - 1}px;height:1px;background:var(--fill)"></div>`;
+    });
+  }
+  const H = Math.max(y0, RH);
+  grid += `<div style="position:absolute;left:${pos(t)}px;top:0;bottom:0;width:2px;background:${alpha("#F04452",.6)};z-index:2"></div>`;
+  $("#gantt").innerHTML = `<div class="gnames"><div class="ghead" style="display:flex;align-items:center;padding-left:14px;font-weight:700;color:var(--sub);font-size:13px">${G.flat ? "항목" : "종류"}</div>${namesHtml || `<div class="grow-h ter small">비어 있어요</div>`}</div>
+    <div class="gscroll" id="gscroll"><div style="width:${W}px"><div class="ghead">${head}</div><div style="position:relative;height:${H}px" id="gbody">${grid}${bodyHtml}${rows.length ? "" : `<div style="position:absolute;left:${pos(t) + 14}px;top:18px" class="small muted">‘+ 계획’으로 언제까지 끝낼 일을 추가하면 여기에 막대로 나와요</div>`}</div></div></div>`;
+  $("#gbody").querySelectorAll(".gtag[data-i]").forEach(el => el.onclick = () => { const r = items[+el.dataset.i]; r.kind === "g" ? openGoal(r.ref.id) : editEvent(r.ref.id); });
   const sc = $("#gscroll"); sc.scrollLeft = Math.max(0, pos(t) - mw * 1.5);
   $("#gantt").querySelectorAll("[data-open]").forEach(el => el.onclick = () => { const [k, id] = el.dataset.open.split(":"); k === "g" ? openGoal(id) : editEvent(id); });
   // drag: move / resize, snapping to days
@@ -609,7 +659,7 @@ function mountGantt(){
   $("#gbody").querySelectorAll(".gbar").forEach(el => {
     el.onmousedown = ev => {
       ev.preventDefault();
-      const r = rows[+el.dataset.i], resize = ev.target.classList.contains("hdl"), x0 = ev.clientX;
+      const r = items[+el.dataset.i], resize = ev.target.classList.contains("hdl"), x0 = ev.clientX;
       let delta = 0, moved = false;
       const lbl = el.querySelector(".lbl"), baseLeft = parseFloat(el.style.left), baseW = parseFloat(el.style.width);
       const mm = e2 => {
