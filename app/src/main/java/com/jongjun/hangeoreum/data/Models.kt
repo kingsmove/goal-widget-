@@ -44,6 +44,8 @@ data class Goal(
     val unit: String = "",
     /** "" = app, "excel" = imported from the Excel template. */
     val source: String = "",
+    /** day to-dos: "am" 오전, "pm" 오후, "" any time */
+    val slot: String = "",
 ) {
     val numeric: Boolean get() = target > 0
 }

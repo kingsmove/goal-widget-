@@ -229,7 +229,7 @@ object Store {
                     put("start", g.startDay); put("end", g.endDay); put("done", g.done)
                     put("memo", g.memo); put("createdAt", g.createdAt); put("color", g.color)
                     put("cc", g.customColor ?: JSONObject.NULL)
-                    put("target", g.target); put("current", g.current); put("unit", g.unit); put("src", g.source)
+                    put("target", g.target); put("current", g.current); put("unit", g.unit); put("src", g.source); put("slot", g.slot)
                 })
             }
         })
@@ -340,6 +340,7 @@ object Store {
                     current = o.optInt("current", 0),
                     unit = o.optString("unit", ""),
                     source = o.optString("src", ""),
+                    slot = o.optString("slot", ""),
                 )
             }
         } ?: emptyList()

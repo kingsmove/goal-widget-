@@ -74,6 +74,7 @@ fun GoalEditorSheet(req: GoalEditReq, data: AppData, onDismiss: () -> Unit) {
     var gColor by remember { mutableIntStateOf(existing?.color ?: -1) }
     var gCustom by remember { mutableStateOf(existing?.customColor) }
     var numeric by remember { mutableStateOf((existing?.target ?: 0) > 0) }
+    var slot by remember { mutableStateOf(existing?.slot ?: "") }
     var targetText by remember { mutableStateOf(existing?.target?.takeIf { it > 0 }?.toString() ?: "") }
     var unit by remember { mutableStateOf(existing?.unit ?: "회") }
     var anchor by remember {
@@ -153,6 +154,11 @@ fun GoalEditorSheet(req: GoalEditReq, data: AppData, onDismiss: () -> Unit) {
                 }
             }
 
+            if (level == Level.DAY) {
+                FieldLabel("언제 할까요?")
+                Segmented(listOf("언제든", "오전", "오후"), listOf("", "am", "pm").indexOf(slot).coerceAtLeast(0)) { slot = listOf("", "am", "pm")[it] }
+            }
+
             FieldLabel("색상")
             ColorChooser(gColor, gCustom, allowDefault = true,
                 onIndex = { gColor = it; gCustom = null },
@@ -188,6 +194,7 @@ fun GoalEditorSheet(req: GoalEditReq, data: AppData, onDismiss: () -> Unit) {
                     existing.copy(
                         title = title.trim(), memo = memo.trim(), level = level, endDay = e, color = gColor, customColor = gCustom,
                         target = if (numeric) targetText.toIntOrNull() ?: 0 else 0, unit = if (numeric) unit.trim() else "",
+                        slot = if (level == Level.DAY) slot else "",
                         startDay = if (level != Level.PLAN && existing.startDay <= e && existing.level == level &&
                             (level == Level.YEAR || level == Level.MONTH)) existing.startDay else s,
                     )
@@ -198,6 +205,7 @@ fun GoalEditorSheet(req: GoalEditReq, data: AppData, onDismiss: () -> Unit) {
                     customColor = gCustom,
                     target = if (numeric) targetText.toIntOrNull() ?: 0 else 0,
                     unit = if (numeric) unit.trim() else "",
+                    slot = if (level == Level.DAY) slot else "",
                 )
                 Store.upsertGoal(goal)
                 close()

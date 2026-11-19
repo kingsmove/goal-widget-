@@ -27,9 +27,11 @@ fun AppData.progress(g: Goal, depth: Int = 0): Float {
 
 fun pct(p: Float): Int = (p * 100).toInt().coerceIn(0, 100)
 
+private fun slotRank(s: String) = when (s) { "am" -> 0; "pm" -> 1; else -> 2 }
+
 fun AppData.todayGoals(today: Long = Dates.today()): List<Goal> =
     goals.filter { it.level == Level.DAY && it.endDay == today }
-        .sortedWith(compareBy<Goal> { it.done }.thenBy { it.createdAt })
+        .sortedWith(compareBy<Goal> { slotRank(it.slot) }.thenBy { it.done }.thenBy { it.createdAt })
 
 fun AppData.todayProgress(today: Long = Dates.today()): Float {
     val list = todayGoals(today)
@@ -62,4 +64,4 @@ fun AppData.eventsOn(day: Long): List<Event> =
     events.filter { it.covers(day) }.sortedWith(compareBy<Event> { !it.isRange }.thenBy { it.minute }.thenBy { it.day })
 
 fun AppData.dayGoalsOn(day: Long): List<Goal> =
-    goals.filter { it.level == Level.DAY && it.endDay == day }.sortedWith(compareBy<Goal> { it.done }.thenBy { it.createdAt })
+    goals.filter { it.level == Level.DAY && it.endDay == day }.sortedWith(compareBy<Goal> { slotRank(it.slot) }.thenBy { it.done }.thenBy { it.createdAt })

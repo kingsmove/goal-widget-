@@ -164,7 +164,13 @@ fun GoalCheckRow(g: Goal, data: AppData, nav: Nav, showParent: Boolean = true) {
         CheckDot(g.done, { Store.toggleGoal(g.id) })
         Gap(14.dp)
         Column(Modifier.weight(1f)) {
-            T(g.title, 16, weight = FontWeight.Medium, color = if (g.done) pal.tertiary else pal.text, maxLines = 2)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (g.slot == "am" || g.slot == "pm") {
+                    Pill(if (g.slot == "am") "오전" else "오후", color = pal.sub, bg = pal.fill)
+                    Gap(6.dp)
+                }
+                T(g.title, 16, weight = FontWeight.Medium, color = if (g.done) pal.tertiary else pal.text, maxLines = 2)
+            }
             if (parent != null) T(parent.title, 13, Modifier.padding(top = 2.dp), color = pal.sub, maxLines = 1)
         }
         val p = data.progress(g)
