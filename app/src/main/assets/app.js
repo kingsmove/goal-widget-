@@ -74,6 +74,7 @@ const MODS = {
   money: { n: '경비', i: 'wallet', c: '#00B386' },
   photo: { n: '사진', i: 'image', c: '#FF4FA3' },
   book: { n: '예약', i: 'ticket', c: '#7B61FF' },
+  diary: { n: '일기', i: 'edit', c: '#F5A623' },
 };
 
 /* ============ time zones ============ */
@@ -426,7 +427,7 @@ function render() {
   $('#mapScreen').classList.toggle('on', isMap);
   $('#screen').style.display = isMap ? 'none' : '';
   if (isMap) { ensureMap(); return; }
-  const fn = { home: vHome, plan: vPlan, place: vPlace, money: vMoney, photo: vPhoto, book: vBook }[ui.tab] || vHome;
+  const fn = { home: vHome, plan: vPlan, place: vPlace, money: vMoney, photo: vPhoto, book: vBook, diary: () => vDiary() }[ui.tab] || vHome;
   $('#screen').innerHTML = fn();
   hydrate($('#screen'));
   if (ui.tab === 'money') tipCalc();
@@ -1257,7 +1258,7 @@ async function onFiles(files) {
       const id = await storeImage(f);
       if (tgt && tgt.kind === 'book') { tgt.draft.imgs.push(id); tgt.fresh.push(id); }
       else if (tgt && tgt.kind === 'map') S.maps.push({ id, title: (f.name || '').replace(/\.[^.]+$/, '').slice(0, 30) || `지도 ${S.maps.length + 1}`, memo: '' });
-      else S.photos.push({ id, date: f.lastModified ? dstr(new Date(f.lastModified)) : todayStr(), caption: '', placeId: (tgt && tgt.placeId) || '' });
+      else S.photos.push({ id, date: (tgt && tgt.date) || (f.lastModified ? dstr(new Date(f.lastModified)) : todayStr()), caption: '', placeId: (tgt && tgt.placeId) || '' });
       ok++;
     } catch (e) { }
   }
@@ -1408,6 +1409,7 @@ function settingsSheet() {
       <div class="f"><label>화면</label><div class="seg">${[['auto', '자동'], ['light', '라이트'], ['dark', '다크']].map(([k, n]) => `<button class="${st.theme === k ? 'on' : ''}" data-a="theme" data-k="${k}">${n}</button>`).join('')}</div></div>
       <div class="f"><label>데이터</label><div class="btns" style="margin-top:0"><button class="btn" data-a="export">백업 내보내기</button><button class="btn" data-a="import">백업 불러오기</button></div>
         <div class="coord">백업 파일엔 사진이 빠져요. 사진은 폰 갤러리에 원본이 남아 있어요.</div>
+        <button class="btn" style="width:100%;margin-top:10px" data-a="book-make">${ico('import', 'i s')}여행 기록 만들기 (일기·일정·사진 → 파일 하나)</button>
         <button class="btn" style="width:100%;margin-top:10px" data-a="xl-import">${ico('import', 'i s')}엑셀로 일정 가져오기</button>
         <button class="btn red" style="width:100%;margin-top:10px" data-a="reset">전체 초기화</button></div>
       <div class="coord" style="justify-content:center;margin-top:22px">지도 © OpenStreetMap · OpenFreeMap · 장소 검색 Photon</div>`,

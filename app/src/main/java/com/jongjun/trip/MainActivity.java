@@ -38,7 +38,8 @@ import java.util.Map;
 public class MainActivity extends Activity {
     private static final String HOST = "appassets.androidplatform.net";
     private static final String START = "https://" + HOST + "/index.html";
-    private static final int REQ_FILES = 11, REQ_SAVE = 12, REQ_LOAD = 13, REQ_LOC = 14;
+    private static final int REQ_FILES = 11, REQ_SAVE = 12, REQ_LOAD = 13, REQ_LOC = 14, REQ_BIG = 15;
+    private OutputStream bigOut;
 
     private WebView web;
     private ValueCallback<Uri[]> fileCb;
@@ -208,6 +209,12 @@ public class MainActivity extends Activity {
                 }
             }
             pendingSave = null;
+        } else if (req == REQ_BIG) {
+            boolean ok = false;
+            if (result == RESULT_OK && data != null && data.getData() != null) {
+                try { bigOut = getContentResolver().openOutputStream(data.getData()); ok = bigOut != null; } catch (Exception e) { bigOut = null; }
+            }
+            web.evaluateJavascript("window.onSaveReady && window.onSaveReady(" + ok + ")", null);
         } else if (req == REQ_LOAD) {
             if (result == RESULT_OK && data != null && data.getData() != null) {
                 try (InputStream in = getContentResolver().openInputStream(data.getData())) {
@@ -255,6 +262,32 @@ public class MainActivity extends Activity {
                 i.putExtra(Intent.EXTRA_TITLE, name);
                 startActivityForResult(i, REQ_SAVE);
             });
+        }
+
+        // large files (travel book): pick a location, then JS streams the text in chunks
+        @JavascriptInterface
+        public void beginSave(String name, String mime) {
+            runOnUiThread(() -> {
+                Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                i.addCategory(Intent.CATEGORY_OPENABLE);
+                i.setType(mime);
+                i.putExtra(Intent.EXTRA_TITLE, name);
+                startActivityForResult(i, REQ_BIG);
+            });
+        }
+
+        @JavascriptInterface
+        public void writeChunk(String text) throws java.io.IOException {
+            if (bigOut != null) bigOut.write(text.getBytes(StandardCharsets.UTF_8));
+        }
+
+        @JavascriptInterface
+        public void endSave() {
+            boolean ok = bigOut != null;
+            try { if (bigOut != null) bigOut.close(); } catch (Exception ignored) { ok = false; }
+            bigOut = null;
+            final boolean fin = ok;
+            runOnUiThread(() -> Toast.makeText(MainActivity.this, fin ? "여행 기록을 저장했어요" : "저장하지 못했어요", Toast.LENGTH_SHORT).show());
         }
 
         @JavascriptInterface
