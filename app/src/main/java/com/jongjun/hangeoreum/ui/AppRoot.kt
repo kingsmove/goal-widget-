@@ -62,6 +62,7 @@ const val STATS = "__stats"
 const val GANTT = "__gantt"
 const val PLANNER = "__planner"
 const val QUOTES = "__quotes"
+const val SCORES = "__scores"
 
 class Nav(
     val openGoal: (String) -> Unit,
@@ -73,6 +74,7 @@ class Nav(
     val openGantt: () -> Unit = {},
     val openPlanner: () -> Unit = {},
     val openQuotes: () -> Unit = {},
+    val openScores: () -> Unit = {},
 )
 
 @Composable
@@ -108,6 +110,7 @@ fun AppRoot(resumeTick: Int, openOverlaySettings: () -> Unit, tabRequest: Pair<I
             openGantt = { stack = stack + GANTT },
             openPlanner = { stack = stack + PLANNER },
             openQuotes = { stack = stack + QUOTES },
+            openScores = { stack = stack + SCORES },
         )
     }
 
@@ -152,6 +155,8 @@ fun AppRoot(resumeTick: Int, openOverlaySettings: () -> Unit, tabRequest: Pair<I
                 Box(Modifier.fillMaxSize().background(pal.bg).statusBarsPadding().navigationBarsPadding()) {
                     if (last == PLANNER) {
                         PlannerScreen(data, now, nav) { stack = stack.dropLast(1) }
+                    } else if (last == SCORES) {
+                        ScoresScreen { stack = stack.dropLast(1) }
                     } else if (last == QUOTES) {
                         QuotesScreen(data) { stack = stack.dropLast(1) }
                     } else if (last == GANTT) {

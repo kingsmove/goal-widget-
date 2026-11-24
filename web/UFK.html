@@ -120,7 +120,13 @@ label.f{display:block;font-size:13px;font-weight:600;color:var(--sub);margin:16p
 .tt .c{height:20px;border-radius:3px;background:var(--fill)}
 .timer{font-size:52px;font-weight:800;letter-spacing:-1.5px;font-variant-numeric:tabular-nums;text-align:center;margin:14px 0 4px}
 .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:#191F28;color:#fff;padding:12px 18px;border-radius:14px;font-weight:600;z-index:60;font-size:14px}
-@media (max-width:900px){.side{display:none}.main{padding:18px}.g2,.g3{grid-template-columns:1fr}}
+@media (max-width:900px){.side{display:none}.main{padding:18px}.g2,.g3{grid-template-columns:1fr}
+  .scgrid,.sceff{grid-template-columns:1fr!important}
+  .scside{grid-auto-flow:column;grid-auto-columns:minmax(170px,1fr);overflow-x:auto;padding:3px}
+  .sceff>div:last-child{border-left:0!important;padding-left:0!important;display:grid;grid-template-columns:1fr 1fr}
+  .modal{max-height:88vh;overflow-y:auto}
+  .scstats{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px}.scstats .card{padding:14px}.scstats span[style*="font-size:36px"],.scstats div[style*="font-size:36px"]{font-size:24px!important}}
+html.embed .side{display:none}html.embed .main{margin-left:0}
 </style>
 </head>
 <body>
@@ -156,12 +162,16 @@ function normalize(d){
   d.timer = Object.assign(b.timer, d.timer);
   return d;
 }
+/** Inside the phone app (WebView): data comes from / goes to the app; the app does its own sync. */
+const EMBED = !!window.UFKAndroid;
 function load(){
+  if (EMBED){ try { D = normalize(JSON.parse(UFKAndroid.load())); } catch(e){ D = blank(); } document.documentElement.classList.add("embed"); return; }
   try { const s = localStorage.getItem(KEY); D = s ? normalize(JSON.parse(s)) : blank(); }
   catch(e){ D = blank(); }
 }
 let saveTimer = null;
 function save(fromRemote){
+  if (EMBED){ try { UFKAndroid.save(JSON.stringify(D)); } catch(e){ toast("저장하지 못했어요"); } return; }
   try { localStorage.setItem(KEY, JSON.stringify(D)); document.getElementById("savedAt").textContent = (Sync.user ? "동기화 · " : "자동 저장됨 · ") + hm(Date.now()); }
   catch(e){ toast("저장하지 못했어요 (브라우저 저장소)"); }
   if (!fromRemote) Sync.schedule();
@@ -866,6 +876,7 @@ let scoreSubj = null, scoreExam = null;
 
 // ---------- chart kit (thick lines, Toss-like)
 const CH = {line:3.5, dot:5.5};
+const NARROW = () => innerWidth < 700;
 function smoothPath(pts){
   if (pts.length < 3) return pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
   let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
@@ -887,7 +898,7 @@ function niceRange(vals, pct, target){
   return [lo, hi];
 }
 /** series: [{name, color, pts:[{i, v, txt, id}]}], labels: x labels by index, style: line|curve|bar */
-function trendChart({series, labels, pct, target, style, H = 300, W = 780, showVals = true}){
+function trendChart({series, labels, pct, target, style, H = 300, W = NARROW() ? 430 : 780, showVals = true}){
   const all = series.flatMap(s => s.pts.map(p => p.v));
   if (!all.length) return '<div class="empty">아직 기록이 없어요</div>';
   const [lo, hi] = niceRange(all, pct, target);
@@ -966,7 +977,7 @@ function donut(items){
 }
 function scatter(pts, color){
   if (pts.length < 2) return `<div class="empty">이 과목으로 타이머를 쓰고 점수가 2회 이상 쌓이면 보여요</div>`;
-  const W = 520, H = 280, L = 46, R = 18, T = 16, B = 44;
+  const W = NARROW() ? 400 : 520, H = 280, L = 46, R = 18, T = 16, B = 44;
   const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
   const x1 = Math.max(1, Math.ceil(Math.max(...xs) * 1.1)), [ylo, yhi] = niceRange(ys, true);
   const X = v => L + v / x1 * (W - L - R), Y = v => T + (1 - (v - ylo) / (yhi - ylo || 1)) * (H - T - B);
@@ -1160,7 +1171,7 @@ function vScoreSubject(sid){
   const wstyle = scStyle(sid, "wrong", "bar");
   const S = JSON.stringify(sid).replace(/"/g, "&quot;");
   return `
-  <div class="card"><div class="row"><span class="dot" style="background:${c};width:14px;height:14px"></span><b class="grow" style="font-size:22px;letter-spacing:-.6px">${esc(scSubjName(sid))}</b>
+  <div class="card"><div class="row" style="flex-wrap:wrap;row-gap:10px"><span class="dot" style="background:${c};width:14px;height:14px"></span><b class="grow" style="font-size:22px;letter-spacing:-.6px;white-space:nowrap">${esc(scSubjName(sid))}</b>
     ${m.examDay != null && m.examDay >= today() ? `<span class="pill" style="font-size:14px">D-${m.examDay - today()}</span>` : ""}
     <button class="chip" onclick="editSubjSettings(${S})">목표·일정</button><button class="btn" onclick="editScore(null, ${S})">+ 점수 기록</button></div></div>
   ${exams.length ? `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(250px,1fr))">${exams.map(n => examCard(sid, n)).join("")}</div>` : `<div class="card"><div class="empty">‘+ 점수 기록’으로 첫 시험을 넣어보세요</div></div>`}
@@ -1171,7 +1182,7 @@ function vScoreSubject(sid){
       ${!m.wrong.length ? `<div class="empty">틀린 이유별로 개수를 기록해요</div>` : wstyle === "donut" ? `<div style="margin-top:14px">${donut(m.wrong.map(x => ({...x})))}</div>` : hBars(m.wrong, c, "개")}
       ${m.wrong.length ? `<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:14px">${m.wrong.map((x, i) => `<button class="chip" style="font-size:12px" onclick="wrongBump(${S},${i},1)">+1 ${esc(x.n)}</button>`).join("")}</div>` : ""}</div>
   </div>
-  <div class="card"><h3 style="font-size:20px">공부 효율</h3><div class="grid" style="grid-template-columns:minmax(0,1fr) 200px;align-items:center">
+  <div class="card"><h3 style="font-size:20px">공부 효율</h3><div class="grid sceff" style="grid-template-columns:minmax(0,1fr) 200px;align-items:center">
     <div>${sc ? sc.svg : `<div class="empty">${ses.length ? "만점이 있는 점수가 2회 이상 쌓이면 보여요" : "타이머·플래너에서 이 과목으로 공부 시간을 기록하면, 공부 시간 대비 점수가 보여요"}</div>`}</div>
     <div style="border-left:1px solid var(--line);padding-left:22px">
       <div class="small muted">이번 주 집중 시간</div><div style="font-size:32px;font-weight:900;color:${c};letter-spacing:-1px">${r1(weekH)}h</div>
@@ -1196,7 +1207,7 @@ function vScoreExam(sid, name){
   if (withP.length){
     const lp = withP[withP.length - 1], pal = itemColors();
     const pp = lp.parts.every(p => p.m);
-    const BW = 780, BH = 280, L = 50, B = 40, T = 30, n = lp.parts.length, band = (BW - L - 24) / n;
+    const BW = NARROW() ? 430 : 780, BH = 280, L = 50, B = 40, T = 30, n = lp.parts.length, band = (BW - L - 24) / n;
     const vals = lp.parts.map(p => pp ? p.s / p.m * 100 : p.s), top = pp ? 100 : Math.max(...vals) * 1.15;
     let g = "";
     for (let k = 0; k <= 4; k++){ const v = top * k / 4, y = T + (1 - k / 4) * (BH - T - B); g += `<line x1="${L}" x2="${BW - 24}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L - 10}" y="${y + 4}" text-anchor="end" font-size="12" font-weight="600" fill="var(--sub)">${Math.round(v)}${pp ? "%" : ""}</text>`; }
@@ -1209,14 +1220,14 @@ function vScoreExam(sid, name){
     const multi = subs.length > 1 && withP.length > 1 ? `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr));margin-top:6px">${subs.map((sn, k) => {
       const col = cols[k % cols.length], pts = withP.map((x, j) => { const p = x.parts.find(q => q.n === sn); return p ? {i:j, v: p.m ? p.s / p.m * 100 : p.s, txt:p.s} : null; }).filter(Boolean);
       const lastP = withP[withP.length - 1].parts.find(q => q.n === sn);
-      return `<div class="card" style="padding:16px"><div class="row"><span class="dot" style="background:${col}"></span><b class="grow">${esc(sn)}</b>${lastP ? `<b style="color:${col}">${lastP.s}${lastP.m ? " / " + lastP.m : ""}</b>` : ""}</div>${trendChart({series:[{name:sn, color:col, pts}], labels: wl.map(i => labels[i]), pct: withP.every(x => x.parts.every(p => p.m)), style:"curve", H:240, W:440, showVals:true})}</div>`;
+      return `<div class="card" style="padding:16px"><div class="row"><span class="dot" style="background:${col}"></span><b class="grow">${esc(sn)}</b>${lastP ? `<b style="color:${col}">${lastP.s}${lastP.m ? " / " + lastP.m : ""}</b>` : ""}</div>${trendChart({series:[{name:sn, color:col, pts}], labels: wl.map(i => labels[i]), pct: withP.every(x => x.parts.every(p => p.m)), style:"curve", H:240, W: NARROW() ? 400 : 440, showVals:true})}</div>`;
     }).join("")}</div>` : "";
     partsHtml = `<div class="card"><h3 style="font-size:20px">파트별 정답률 · ${labels[list.indexOf(lp)]}</h3><svg viewBox="0 0 ${BW} ${BH}" style="width:100%;height:auto">${g}</svg></div>${multi ? `<h3 style="margin:8px 4px 0;font-size:18px">파트별 추이</h3>${multi}` : ""}`;
   }
   return `
-  <div class="card"><div class="row"><button class="chip" onclick="scoreExam=null;render()">‹ ${esc(scSubjName(sid))}</button><span class="dot" style="background:${c};width:12px;height:12px;margin-left:6px"></span><b class="grow" style="font-size:21px">${esc(name)}</b>
+  <div class="card"><div class="row" style="flex-wrap:wrap;row-gap:10px"><button class="chip" onclick="scoreExam=null;render()">‹ ${esc(scSubjName(sid))}</button><span class="dot" style="background:${c};width:12px;height:12px;margin-left:6px"></span><b class="grow" style="font-size:21px;flex:1 1 200px">${esc(name)}</b>
     <button class="chip" onclick="examRename(${S},${N})">이름</button><button class="chip" onclick="examMove(${S},${N})">과목 옮기기</button><button class="chip" style="color:var(--red)" onclick="examDelete(${S},${N})">삭제</button><button class="btn" onclick="editScore(null, ${S}, ${N})">+ 점수</button></div></div>
-  <div class="grid g3">
+  <div class="grid g3 scstats">
     <div class="card"><div class="small muted">최근 · ${labels[labels.length - 1]}</div><div class="row" style="align-items:baseline"><span style="font-size:36px;font-weight:900;color:${c};letter-spacing:-1px">${last.score}</span>${last.max ? `<span class="muted" style="font-size:17px;margin-left:4px">/ ${last.max}</span>` : ""}</div><div class="small" style="color:${diff == null ? "var(--ter)" : diff >= 0 ? "var(--green)" : "var(--red)"};font-weight:800">${diff == null ? "첫 기록" : (diff >= 0 ? "▲ " : "▼ ") + Math.abs(r1(diff)) + " 지난번보다"}</div></div>
     <div class="card"><div class="small muted">최고</div><div style="font-size:36px;font-weight:900;letter-spacing:-1px">${best.score}</div><div class="small ter">${labels[list.indexOf(best)]}</div></div>
     <div class="card"><div class="small muted">평균 · ${list.length}회</div><div style="font-size:36px;font-weight:900;letter-spacing:-1px">${r1(avg)}</div>${m.target != null && pct ? `<div class="small muted">목표 ${m.target}%</div>` : ""}</div>
@@ -1228,7 +1239,7 @@ function vScoreExam(sid, name){
 function vScores(){
   const subs = scSubjects();
   if (scoreSubj == null || !subs.includes(scoreSubj)) { scoreSubj = subs[0] ?? null; scoreExam = null; }
-  const side = `<div class="grid" style="align-content:start;gap:10px">${subs.map(sid => {
+  const side = `<div class="grid scside" style="align-content:start;gap:10px">${subs.map(sid => {
     const ex = examsOf(sid), n = SC_ENTRIES().filter(x => (x.subj || "") === sid).length, on = sid === scoreSubj;
     return `<div class="card" style="padding:16px;cursor:pointer;${on ? "outline:2.5px solid " + scSubjColor(sid) : ""}" onclick="scoreSubj=${JSON.stringify(sid).replace(/"/g, "&quot;")};scoreExam=null;render()">
       <div class="row"><span class="dot" style="background:${scSubjColor(sid)};width:12px;height:12px"></span><b class="grow" style="font-size:16px">${esc(scSubjName(sid))}</b><span class="small muted">${n}회</span></div>
@@ -1237,7 +1248,7 @@ function vScores(){
   if (scoreSubj == null) return `<div class="row"><h1 class="grow">성적</h1><button class="btn" onclick="addScoreSubject()">+ 과목</button></div><div class="card"><div class="empty">토익, 건축기사처럼 과목을 만들고, 그 안에 시험·교재별로 점수를 넣어요</div></div>`;
   const main = scoreExam ? vScoreExam(scoreSubj, scoreExam) : vScoreSubject(scoreSubj);
   return `<div class="row"><h1 class="grow">성적</h1></div>
-  <div class="grid" style="grid-template-columns:240px minmax(0,1fr);align-items:start">${side}<div class="grid">${main}</div></div>`;
+  <div class="grid scgrid" style="grid-template-columns:240px minmax(0,1fr);align-items:start">${side}<div class="grid">${main}</div></div>`;
 }
 
 // ============================================================ QUOTES
@@ -1457,13 +1468,14 @@ $("#fileIn").onchange = async ev => {
 function modal(html){ $("#modalRoot").innerHTML = `<div class="ov" onmousedown="if(event.target===this)closeModal()"><div class="modal">${html}</div></div>`; }
 function closeModal(){ $("#modalRoot").innerHTML = ""; }
 addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+addEventListener("resize", (() => { let w = innerWidth < 700; return () => { if ((innerWidth < 700) !== w){ w = innerWidth < 700; if (view === "scores") render(); } }; })());
 addEventListener("hashchange", () => { const v = location.hash.slice(1); if (v && v !== view && VIEWS.some(x => x[0] === v)){ view = v; render(); } });
 addEventListener("storage", e => { if (e.key === KEY){ load(); render(); } }); // another tab changed data
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => applyTheme());
 setInterval(() => { const c = document.getElementById("tclock"); if (c && D.timer.running) c.textContent = clock(timerElapsed()); }, 500);
 
 load(); ensureRoutines(); render();
-if (!FB_CONFIG.apiKey.startsWith("__")) Sync.init(); else Sync.setStatus("동기화가 설정되지 않은 버전이에요");
+if (EMBED) {} else if (!FB_CONFIG.apiKey.startsWith("__")) Sync.init(); else Sync.setStatus("동기화가 설정되지 않은 버전이에요");
 </script>
 </body>
 </html>

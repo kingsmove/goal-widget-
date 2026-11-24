@@ -70,6 +70,10 @@ fun TimerScreen(data: AppData, now: Long, nav: Nav, resumeTick: Int, openOverlay
                         .bounceClick { nav.openPlanner() }.padding(horizontal = 12.dp, vertical = 9.dp)
                 ) { T("플래너", 14, weight = FontWeight.SemiBold, color = pal.blue) }
                 Box(
+                    Modifier.padding(end = 8.dp).clip(RoundedCornerShape(12.dp)).background(pal.card)
+                        .bounceClick { nav.openScores() }.padding(horizontal = 12.dp, vertical = 9.dp)
+                ) { T("성적", 14, weight = FontWeight.SemiBold, color = pal.blue) }
+                Box(
                     Modifier.clip(RoundedCornerShape(12.dp)).background(pal.card)
                         .bounceClick { nav.openStats() }.padding(horizontal = 12.dp, vertical = 9.dp)
                 ) { T("통계", 14, weight = FontWeight.SemiBold, color = pal.blue) }

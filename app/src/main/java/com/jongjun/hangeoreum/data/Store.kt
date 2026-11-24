@@ -209,6 +209,11 @@ object Store {
     /** Full data as JSON (also the backup file format). */
     fun exportJson(): String = toJson(_data.value)
 
+    /** Data written by the in-app web screen (성적). No backup copy, it is called on every edit. */
+    fun applyJson(text: String) {
+        runCatching { fromJson(text) }.onSuccess { d -> update { d } }
+    }
+
     /** Replaces everything with a backup. The current data is kept as data.before-restore.json. */
     fun importJson(text: String): Result<AppData> = runCatching {
         val d = fromJson(text)
